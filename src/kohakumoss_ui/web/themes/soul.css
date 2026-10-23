@@ -1,0 +1,267 @@
+/* Soul: forge-era precision instrument. Ember accent, a five-step surface ramp,
+   borders instead of shadows, and one emphasis outlet. Every value below is the
+   exact token from the souldesign forge token sheet (design-tokens.md §1) -- do
+   not re-derive them by eye. */
+
+/* Five-step ramp (§1.B), mapped onto this project's semantic names:
+   canvas=bg-base, panel=bg-surface, panel-alt=bg-deep (the sidebar, footer and
+   log wells sit one step deeper), elevated=bg-elevated, overlay=bg-overlay. */
+html[data-theme="soul"]{
+  --heat-0:var(--panel-alt);
+  --heat-1:color-mix(in srgb,var(--accent) 22%,var(--panel));
+  --heat-2:color-mix(in srgb,var(--accent) 44%,var(--panel));
+  --heat-3:color-mix(in srgb,var(--accent) 72%,var(--panel));
+  --heat-4:var(--accent);
+  --radius-sm:4px;
+  --radius-md:6px;
+  --radius-lg:8px;
+  --radius-status:3px;
+  --font-ui:"Noto Sans","Noto Sans CJK SC",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,monospace;
+  --warn:var(--status-warn);
+}
+html[data-theme="soul"][data-mode="carbon"]{
+  --canvas:#141618;
+  --panel:#1C1F22;
+  --panel-alt:#111315;
+  --elevated:#272B2F;
+  --hover:#2C3136;
+  --overlay:#1C1F22;
+  /* three border steps (§1.D) -- the dark UI's only elevation device */
+  --border-subtle:#2A2E33;
+  --border-default:#383E44;
+  --border-strong:#555F69;
+  /* four text steps (§1.C) */
+  --text-primary:#EEF0F2;
+  --text-secondary:#A8AFB6;
+  --text-muted:#929AA3;
+  --text-disabled:#69727B;
+  --text-inverse:#141618;
+  /* ember (§1.A): primary #EBA375. accent-weak carries the §1.F glow value and
+     doubles as the focus halo; on-ember ink is #251C16 (§1.E). */
+  --accent:#EBA375;
+  --accent-weak:rgb(235 163 117 / 12%);
+  --accent-strong:#f3b48c;
+  --accent-on:#251C16;
+  /* status semantics (§1.E) */
+  --status-run:#EBA375;
+  --status-ok:#89C5A2;
+  --status-warn:#E3BC75;
+  --status-error:#F18C96;
+  --status-idle:#A8AFB6;
+  --info:#91B9EA;
+  --radius:4px;
+  /* Wash tints: the same recipe appearance.js derives when a user overrides the
+     five colours, so a themed page and an overridden page hover alike. Without
+     these .nav a:hover, .led tr:hover td, .code and .shot fall back to no fill. */
+  --tint:color-mix(in srgb,var(--text-primary) 6%,transparent);
+  --tint2:color-mix(in srgb,var(--text-primary) 10%,transparent);
+}
+
+html[data-theme="soul"][data-mode="light"]{
+  --canvas:#F6F7F8;
+  --panel:#FFFFFF;
+  --panel-alt:#EDF0F2;
+  --elevated:#FFFFFF;
+  --hover:#E9EDF0;
+  --overlay:#FFFFFF;
+  --border-subtle:#E0E5E9;
+  --border-default:#CBD3DA;
+  --border-strong:#9AA6B0;
+  --text-primary:#242A30;
+  --text-secondary:#626C76;
+  --text-muted:#68737E;
+  --text-disabled:#8A959F;
+  --text-inverse:#FFFFFF;
+  --accent:#9D4C23;
+  --accent-weak:rgb(157 76 35 / 10%);
+  --accent-strong:#833c19;
+  --accent-on:#FFFFFF;
+  --status-run:#9D4C23;
+  --status-ok:#327653;
+  --status-warn:#956914;
+  --status-error:#BA3B50;
+  --status-idle:#626C76;
+  --info:#356FA8;
+  --radius:4px;
+  --tint:color-mix(in srgb,var(--text-primary) 6%,transparent);
+  --tint2:color-mix(in srgb,var(--text-primary) 10%,transparent);
+}
+
+/* Active nav item, the forge signature (§6 of the skill): ember glyph + 12% ember
+   wash + 2px ember rule on the inset edge, all three at once. The 2px rule is
+   app.css's existing transparent left border, so only its colour changes here.
+   data-dark is the runtime luminance flag, so a user who brightens the carbon
+   canvas keeps a readable active row. */
+html[data-theme="soul"][data-dark="on"] .nav a.on,
+html[data-theme="soul"]:not([data-dark="on"]) .nav a.on{
+  background:var(--accent-weak);
+  border-left-color:var(--accent);
+  color:var(--accent);
+}
+html[data-theme="soul"][data-dark="on"] .nav a.on .idx,
+html[data-theme="soul"]:not([data-dark="on"]) .nav a.on .idx{
+  color:var(--accent);
+  opacity:.75;
+}
+
+/* Filled slabs are not forge. On a dark surface the selected segment and knob
+   level take the same ember wash as the nav instead of a bright --text-primary
+   block (app.css already does this for .nav and .btn.pri). */
+html[data-theme="soul"][data-dark="on"] .seg button.on,
+html[data-theme="soul"][data-dark="on"] .knoblevels .btn.on{
+  background:var(--accent-weak);
+  border-color:var(--accent);
+  color:var(--accent);
+}
+
+/* Focus: fields glow with the ember halo (tokens §1.F), controls keep the 2px
+   ember ring app.css draws. Geometry untouched: a halo is a shadow, never a
+   thicker border. */
+html[data-theme="soul"] :is(.btn,.chip,.knobcontrol):focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:2px;
+}
+html[data-theme="soul"] .field:focus,
+html[data-theme="soul"] .field:focus-visible{
+  outline:none;
+  border-bottom-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-weak);
+}
+
+/* Status stamps: a gem wash under the glyph, with the hue taken from the colour
+   app.css already assigns -- by data-status on the studio rows and by the legacy
+   .run/.stop/.done/.unknown classes elsewhere -- so one rule covers every value.
+   No animation: state chips never pulse. */
+html[data-theme="soul"] .st{
+  background:color-mix(in srgb,currentColor 11%,transparent);
+  border-radius:var(--radius-status);
+}
+
+/* Empty state: colours only, the block's dimensions belong to app.css. */
+html[data-theme="soul"] .empty b{color:var(--text-secondary)}
+
+/* Primary button: on the light canvas the fill is ember with white ink (§1.E:
+   on-primary is #FFFFFF in light, #251C16 in carbon -- app.css already paints
+   the carbon case). Ember is the one emphasis outlet, not a neutral slab. */
+html[data-theme="soul"]:not([data-dark="on"]) .btn.pri{
+  background:var(--accent);
+  border-color:var(--accent);
+  color:var(--accent-on);
+}
+html[data-theme="soul"]:not([data-dark="on"]) .btn.pri:hover{
+  background:var(--accent);
+  border-color:var(--accent-strong);
+  color:var(--accent-on);
+  filter:brightness(.94);
+}
+
+/* Hover: ember wash instead of inverted slabs on the light canvas; carbon
+   already gets it from app.css. Primary and danger keep their own fills. */
+html[data-theme="soul"]:not([data-dark="on"]) .btn:not(.pri):not(.dngr):hover{
+  background:var(--accent-weak);
+  border-color:var(--accent);
+  color:var(--text-primary);
+}
+
+/* Radii (tokens §3): 4 fields and buttons, 6 cards, 3 chips. Border radius only. */
+html[data-theme="soul"] :is(.btn,.seg){border-radius:var(--radius-sm)}
+html[data-theme="soul"] .theme{border-radius:var(--radius-md)}
+html[data-theme="soul"] .knob-state{border-radius:var(--radius-status)}
+html[data-theme="soul"] .box,
+html[data-theme="soul"] .alert,
+html[data-theme="soul"] .code,
+html[data-theme="soul"] .shot,
+html[data-theme="soul"] details.adv{border-radius:var(--radius-md)}
+html[data-theme="soul"] .chip{border-radius:var(--radius-status)}
+
+/* Six-pixel scrollbars (tokens §4). Higher specificity than base.css's bare
+   pseudo-element selectors, so no !important is needed. */
+html[data-theme="soul"] ::-webkit-scrollbar{width:6px;height:6px}
+html[data-theme="soul"] ::-webkit-scrollbar-track{background:transparent}
+html[data-theme="soul"] ::-webkit-scrollbar-thumb{background:var(--border-default);border-radius:3px}
+html[data-theme="soul"] ::-webkit-scrollbar-thumb:hover{background:var(--border-strong)}
+html[data-theme="soul"] ::-webkit-scrollbar-corner{background:transparent}
+
+/* Forge control family. The shared compact geometry remains the project's;
+   outlined fields, tonal selections and zero tracking belong to this theme. */
+html[data-theme="soul"][data-mode][data-lang] .app *{letter-spacing:0}
+html[data-theme="soul"] :is(pre,code,.code,.logbox,.rawname,.knob-state,.st,.foot,.mast .chip,.runner .bar,.cfg-link,.cfg-base,.led td.num,.ledger td.v,.knobcontrol .field,.newrun-head .field){font-family:var(--font-mono)}
+
+html[data-theme="soul"] .btn,
+html[data-theme="soul"] .mast button,
+html[data-theme="soul"] .mast a.mini,
+html[data-theme="soul"] .knob-help-btn{
+  appearance:none;background:var(--panel);color:var(--text-secondary);
+  border-color:var(--border-default);border-style:solid;border-radius:var(--radius-sm);
+  font-weight:500;text-transform:none;box-shadow:none;
+  transition:background-color 120ms ease-out,border-color 120ms ease-out,color 120ms ease-out;
+}
+html[data-theme="soul"] :is(.btn,.mast button,.mast a.mini,.knob-help-btn):not(.pri):not(.dngr):not(.on):not(:disabled):hover{
+  background:var(--hover);color:var(--text-primary);border-color:var(--border-strong);
+}
+html[data-theme="soul"] .btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-on)}
+html[data-theme="soul"] .btn.pri:hover{background:var(--accent);border-color:var(--accent-strong);color:var(--accent-on);filter:brightness(.96)}
+html[data-theme="soul"] .btn.dngr{background:none;border-color:var(--border-default);color:var(--status-error)}
+html[data-theme="soul"] .btn.dngr:hover{background:color-mix(in srgb,var(--status-error) 11%,transparent);border-color:var(--status-error);color:var(--status-error)}
+html[data-theme="soul"] .btn.on:not(.pri):not(.dngr):not(:disabled){background:var(--accent-weak);border-color:var(--accent);color:var(--accent)}
+html[data-theme="soul"] .btn:not(:disabled):active{transform:translateY(1px)}
+
+html[data-theme="soul"] .seg{background:var(--panel-alt);border-color:var(--border-default);border-radius:var(--radius-sm);overflow:hidden}
+html[data-theme="soul"] .seg button{background:none;color:var(--text-secondary);border-right-color:var(--border-default);text-transform:none;font-weight:500}
+html[data-theme="soul"] .seg button.on{background:var(--accent-weak);color:var(--accent)}
+html[data-theme="soul"] .seg button:not(.on):not(:disabled):hover{background:var(--hover);color:var(--text-primary)}
+html[data-theme="soul"] .seg button:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--accent)}
+
+html[data-theme="soul"] :is(input.field,select.field,textarea.field){
+  appearance:none;background:var(--panel);background-image:none;border-color:transparent;
+  border-radius:var(--radius-sm);box-shadow:inset 0 0 0 1px var(--border-default);font-weight:400;
+  transition:box-shadow 160ms ease-out;
+}
+html[data-theme="soul"] select.field{appearance:base-select}
+html[data-theme="soul"] :is(input.field,select.field,textarea.field):hover{box-shadow:inset 0 0 0 1px var(--border-strong)}
+html[data-theme="soul"] .app :is(input.field,select.field,textarea.field):is(:focus,:focus-visible){
+  border-color:transparent;outline:none;
+  box-shadow:inset 0 0 0 1px var(--accent),0 0 0 3px var(--accent-weak);
+}
+html[data-theme="soul"] .field::placeholder{color:var(--text-muted);opacity:1}
+html[data-theme="soul"] select.field::picker(select){background:var(--overlay);border-color:var(--border-default);border-radius:var(--radius-sm);box-shadow:none}
+html[data-theme="soul"] select.field option{background:var(--overlay);color:var(--text-primary);border-radius:0}
+html[data-theme="soul"] select.field option:is(:hover,:focus){background:var(--hover);color:var(--text-primary)}
+html[data-theme="soul"] select.field option:checked{background:var(--accent-weak);color:var(--accent)}
+html[data-theme="soul"] select.field option::checkmark{color:inherit}
+
+html[data-theme="soul"] .tabs{box-shadow:inset 0 -1px 0 var(--border-default)}
+html[data-theme="soul"] .tabs button{background:none;border-color:transparent;color:var(--text-secondary);text-transform:none}
+html[data-theme="soul"] .tabs button.on{background:var(--accent-weak);border-color:transparent;color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent)}
+html[data-theme="soul"] .theme{background:var(--panel);border-color:var(--border-default);border-radius:var(--radius-md);box-shadow:none}
+html[data-theme="soul"] .theme.on{background:var(--panel-alt);border-color:var(--accent)}
+html[data-theme="soul"] .csw input[type="color"]{appearance:none;background:var(--panel);border-color:var(--border-default);border-radius:var(--radius-sm);box-shadow:none}
+html[data-theme="soul"] .csw input::-webkit-color-swatch-wrapper{padding:3px}
+html[data-theme="soul"] .csw input::-webkit-color-swatch{border:1px solid var(--text-muted);border-radius:2px}
+html[data-theme="soul"] .csw input::-moz-color-swatch{border:1px solid var(--text-muted);border-radius:2px}
+html[data-theme="soul"] .led td{border-bottom-style:solid;border-bottom-color:var(--border-subtle)}
+html[data-theme="soul"] .led th{border-bottom-color:var(--border-default);font-weight:500}
+html[data-theme="soul"] .led .red{color:var(--status-error)}
+html[data-theme="soul"] .st.runn{color:var(--status-run);border-color:var(--status-run)}
+html[data-theme="soul"] .st.done{color:var(--status-ok);border-color:var(--status-ok)}
+html[data-theme="soul"] .st.unkn{color:var(--text-muted);border-color:var(--border-default)}
+html[data-theme="soul"] .shot{border-radius:var(--radius-lg);overflow:hidden}
+html[data-theme="soul"] :is(.nav .grp,.kgsubhead,.knobpage-head){border-bottom-style:solid;border-bottom-color:var(--border-subtle)}
+html[data-theme="soul"] .axisline{border-top-style:solid;border-top-color:var(--border-subtle)}
+html[data-theme="soul"] .ledger td.dots{border-bottom-color:transparent}
+html[data-theme="soul"] .tabs button:focus-visible,
+html[data-theme="soul"] .knobswork .knobtabs button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+html[data-theme="soul"] .knobswork .knobtabs button:focus-visible::before{content:none}
+
+html[data-theme="soul"] :is(.btn,.mast button,.seg button,.knob-help-btn):is(:disabled,:disabled:hover){
+  background:var(--panel-alt);border-color:var(--border-default);color:var(--text-disabled);
+  opacity:1;filter:none;box-shadow:none;transform:none;cursor:not-allowed;
+}
+html[data-theme="soul"] .app :is(input.field,select.field,textarea.field):disabled{
+  background:var(--panel-alt);color:var(--text-disabled);box-shadow:inset 0 0 0 1px var(--border-default);cursor:not-allowed;
+}
+html[data-theme="soul"][data-glass="on"] .app :is(input.field,select.field,textarea.field){background-color:transparent}
+@media (pointer:coarse){
+  html[data-theme="soul"] :is(input.field,select.field,textarea.field){font-size:max(16px,var(--fs-body))}
+}

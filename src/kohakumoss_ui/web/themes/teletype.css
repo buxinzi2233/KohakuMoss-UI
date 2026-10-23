@@ -1,0 +1,410 @@
+/* Teletype: receipt paper, black + red ribbon, perforated edge. */
+
+/* Type and material ownership (docs/teletype.md §3, §4): the theme holds its own
+   scale, tracking and leading, so a change to a neutral default cannot leak in. */
+html[data-theme="teletype"]{
+  --heat-radius:0;
+  --heat-0:color-mix(in srgb,var(--ink) 7%,var(--paper));
+  --heat-1:color-mix(in srgb,var(--ink) 26%,var(--paper));
+  --heat-2:color-mix(in srgb,var(--ink) 46%,var(--paper));
+  --heat-3:color-mix(in srgb,var(--ink) 68%,var(--paper));
+  --heat-4:var(--ink);
+  --font-ui:"IBM Plex Mono",ui-monospace,"JetBrains Mono","SFMono-Regular",Menlo,Consolas,monospace;
+  --font-mono:var(--font-ui);
+  --scale:1.1;
+  --fs-body:calc(14px * var(--scale));
+  --fs-9:calc(9px * var(--scale));
+  --fs-10:calc(10px * var(--scale));
+  --fs-11:calc(11px * var(--scale));
+  --fs-12:calc(12px * var(--scale));
+  --fs-13:calc(13px * var(--scale));
+  --fs-14:calc(14px * var(--scale));
+  --lh-body:1.5;
+  --lh-head:1.25;
+  --lh-label:1.3;
+  --lh-data:1.35;
+  --lh-log:1.65;
+  --lh-micro:1.2;
+  --track-micro:.10em;
+  --track-label:.14em;
+  --track-head:.16em;
+  --track-brand:.20em;
+  --radius-sm:0;
+  --radius-md:0;
+  --radius-lg:0;
+  --shadow-panel:none;
+  --shadow-focus:none;
+  font-family:var(--font-ui);
+  line-height:var(--lh-body);
+  letter-spacing:0;
+  font-variant-numeric:tabular-nums;
+}
+
+/* §3 theme-only material tokens: declared in both modes, never recomputed by
+   the five pickers. --perf / --perf-hole numerals are frozen (user-owned). */
+html[data-theme="teletype"][data-mode="light"]{
+  --desk:#0f1110;
+  --desk-fg:#e4e0d6;
+  --paper:#efe9dc;
+  --perf:#ddd3c1;
+  --perf-hole:color-mix(in srgb,var(--ink) 24%,var(--paper));
+  --rule:#b9aa90;
+  --ink:#221f1a;
+  --dim:#57503f;
+  --red:#8f3418;
+  --warn:#b3231a;
+  --tint:rgba(60,45,25,.05);
+  --tint2:rgba(60,45,25,.10);
+  --log-text:var(--ink);
+  --canvas:var(--paper);
+  --panel:var(--paper);
+  --panel-alt:var(--tint);
+  --elevated:var(--paper);
+  --overlay:var(--paper);
+  --border-subtle:var(--rule);
+  --border-default:var(--rule);
+  --border-strong:var(--ink);
+  --text-primary:var(--ink);
+  --text-secondary:#3d382e;
+  --text-muted:var(--dim);
+  --text-disabled:#857b68;
+  --text-inverse:var(--paper);
+  --accent:var(--red);
+  --accent-weak:var(--tint2);
+  --accent-strong:var(--red);
+  --accent-on:var(--paper);
+  --status-run:var(--red);
+  --status-ok:var(--ink);
+  --status-warn:var(--warn);
+  --status-error:var(--warn);
+  --status-idle:var(--dim);
+}
+html[data-theme="teletype"][data-mode="carbon"]{
+  --desk:#0f1110;
+  --desk-fg:#dee2e1;
+  --paper:#202224;
+  --perf:#282a2c;
+  --perf-hole:color-mix(in srgb,var(--ink) 6%,#0a0b0c);
+  --rule:#3e4042;
+  --ink:#d2d2d2;
+  --dim:#9a9a9a;
+  --red:#cf7263;
+  --warn:#e8755a;
+  --tint:rgba(210,210,210,.05);
+  --tint2:rgba(210,210,210,.09);
+  --log-text:#c6c6c4;
+  --canvas:var(--paper);
+  --panel:var(--paper);
+  --panel-alt:var(--tint);
+  --elevated:var(--paper);
+  --overlay:var(--paper);
+  --border-subtle:var(--rule);
+  --border-default:var(--rule);
+  --border-strong:var(--ink);
+  --text-primary:var(--ink);
+  --text-secondary:#bcbcbc;
+  --text-muted:var(--dim);
+  --text-disabled:#737373;
+  --text-inverse:var(--paper);
+  --accent:var(--red);
+  --accent-weak:var(--tint2);
+  --accent-strong:var(--red);
+  --accent-on:var(--paper);
+  --status-run:var(--red);
+  --status-ok:var(--ink);
+  --status-warn:var(--warn);
+  --status-error:var(--warn);
+  --status-idle:var(--dim);
+}
+
+/* Shell: the 15px punched gutter is teletype's, not the neutral frame's. */
+html[data-theme="teletype"] .app{
+  padding-left:15px;
+  background-image:repeating-linear-gradient(0deg,rgba(50,40,25,.018) 0 1px,transparent 1px 5px);
+}
+/* solid graphite: no scan-line paper texture in carbon (perforated edge stays) */
+html[data-theme="teletype"][data-mode="carbon"] .app{
+  background-image:none;
+}
+html[data-theme="teletype"] .app::before{
+  content:"";
+  position:absolute;left:0;top:0;bottom:0;width:15px;
+  background-color:var(--perf);
+  background-image:radial-gradient(circle at 7.5px 9px,var(--perf-hole,color-mix(in srgb,var(--ink) 16%,var(--paper))) 3px,transparent 3.4px);
+  background-size:15px 22px;background-repeat:repeat-y;
+  border-right:1px dashed var(--rule);
+  pointer-events:none;
+}
+html[data-theme="teletype"] .vhead{border-color:var(--rule)}
+html[data-theme="teletype"] .mast{border-bottom:1px solid var(--rule)}
+html[data-theme="teletype"] .box h3::after{content:"";flex:1;border-bottom:1px dotted var(--rule)}
+
+/* §4 tracking tiers: micro .10em, label .14em, headline .16em; .20em only on
+   the masthead wordmark and the nav group labels. Everything lowercase, numeric,
+   path-like or printed (logs, code, cells) is untracked. */
+:where(html[data-theme="teletype"]) .brand{letter-spacing:var(--track-brand)}
+:where(html[data-theme="teletype"]) .nav .grp{letter-spacing:var(--track-brand)}
+:where(html[data-theme="teletype"]) .nav a{letter-spacing:var(--track-label);line-height:var(--lh-label)}
+:where(html[data-theme="teletype"]) .mast,
+:where(html[data-theme="teletype"]) .mast .crumb b,
+:where(html[data-theme="teletype"]) .nav a .idx,
+:where(html[data-theme="teletype"]) .box h3 b,
+:where(html[data-theme="teletype"]) .axisline,
+:where(html[data-theme="teletype"]) .hint,
+:where(html[data-theme="teletype"]) .okline,
+:where(html[data-theme="teletype"]) .toast,
+:where(html[data-theme="teletype"]) .empty,
+:where(html[data-theme="teletype"]) .shot .cap,
+:where(html[data-theme="teletype"]) .form .val,
+:where(html[data-theme="teletype"]) .ledger,
+:where(html[data-theme="teletype"]) details.adv .row label,
+:where(html[data-theme="teletype"]) .ln,
+:where(html[data-theme="teletype"]) .ln .lv,
+:where(html[data-theme="teletype"]) .logbox,
+:where(html[data-theme="teletype"]) .code{letter-spacing:0}
+:where(html[data-theme="teletype"]) .vhead .meta,
+:where(html[data-theme="teletype"]) .foot,
+:where(html[data-theme="teletype"]) .loading,
+:where(html[data-theme="teletype"]) .runner,
+:where(html[data-theme="teletype"]) .csw,
+:where(html[data-theme="teletype"]) .theme .note,
+:where(html[data-theme="teletype"]) .mast .chip{letter-spacing:var(--track-micro);line-height:var(--lh-micro)}
+:where(html[data-theme="teletype"]) .btn,
+:where(html[data-theme="teletype"]) .tabs button,
+:where(html[data-theme="teletype"]) .st,
+:where(html[data-theme="teletype"]) .alert .h,
+:where(html[data-theme="teletype"]) .form .lab,
+:where(html[data-theme="teletype"]) .box h3,
+:where(html[data-theme="teletype"]) .theme-title,
+:where(html[data-theme="teletype"]) .seg button,
+:where(html[data-theme="teletype"]) .mast button,
+:where(html[data-theme="teletype"]) .mast a.mini,
+:where(html[data-theme="teletype"]) .runner .live,
+:where(html[data-theme="teletype"]) details.adv>summary,
+:where(html[data-theme="teletype"]) details.adv .sec h4{letter-spacing:var(--track-label);line-height:var(--lh-label)}
+:where(html[data-theme="teletype"]) .vhead h2{font-size:var(--fs-14);line-height:var(--lh-head);letter-spacing:var(--track-head)}
+:where(html[data-theme="teletype"]) .led th{letter-spacing:var(--track-head);line-height:var(--lh-label)}
+:where(html[data-theme="teletype"]) .empty b{font-size:var(--fs-13);font-weight:700;line-height:var(--lh-head);letter-spacing:var(--track-head);text-transform:uppercase}
+:where(html[data-theme="teletype"]) .runner .row{letter-spacing:0;line-height:var(--lh-data)}
+
+/* §4 leading per role: data rows tight, logs loose, printed surfaces tabular. */
+:where(html[data-theme="teletype"]) .led td{line-height:var(--lh-data)}
+:where(html[data-theme="teletype"]) .led td.num,
+:where(html[data-theme="teletype"]) .ledger td.v{font-variant-numeric:tabular-nums}
+:where(html[data-theme="teletype"]) .logbox{font-size:var(--fs-11);line-height:var(--lh-log);color:var(--log-text)}
+:where(html[data-theme="teletype"]) pre.chart{color:var(--log-text)}
+
+/* §3 status decoupling: alarm ink is the --warn token (declared above), so no
+   status rule in app.css reaches for the ribbon (--red) or --accent. */
+
+/* ---------------------------------------------------------------------------
+   §7 Component recipes. Every rule is scoped to html[data-theme="teletype"], so
+   app.css keeps serving kohaku and soul byte-for-byte the same.
+   ------------------------------------------------------------------------- */
+
+/* Buttons: 3px double frame; padding gives back the two extra border pixels so
+   the outer box keeps its 3px 9px footprint. Hover and active are solid flips. */
+html[data-theme="teletype"] .btn{border:3px double var(--border-strong);padding:1px 7px}
+html[data-theme="teletype"] .btn.pri{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+html[data-theme="teletype"] .btn:hover{background:var(--text-primary);border-color:var(--text-primary);color:var(--text-inverse)}
+html[data-theme="teletype"] .btn.pri:hover{background:var(--accent);border-color:var(--accent);color:var(--accent-on)}
+html[data-theme="teletype"] .btn:active{background:var(--accent);border-color:var(--accent);color:var(--accent-on)}
+html[data-theme="teletype"] .btn.dngr{border-color:var(--warn);color:var(--warn)}
+html[data-theme="teletype"] .btn.dngr:hover{background:var(--warn);border-color:var(--warn);color:var(--paper)}
+html[data-theme="teletype"] .btn:disabled,
+html[data-theme="teletype"] .btn:disabled:hover{background:none;border-color:var(--text-disabled);color:var(--text-disabled);opacity:1;cursor:not-allowed}
+
+/* Tabs: no rule of their own. app.css owns the box (a three-sided frame on the
+   active label, `margin-bottom: -1px` so it bites into the strip rule); the
+   theme only sets the type rhythm in §3. */
+
+/* Inputs: the rule under the slot is a background line, so focus can print a
+   second line (3px double) without moving the box. No ring, no fill, no radius. */
+html[data-theme="teletype"] .field,
+html[data-theme="teletype"] details.adv .row input,
+html[data-theme="teletype"] details.adv .row textarea{
+  border:0;border-radius:0;box-shadow:none;outline:none;background-color:transparent;
+  background-image:linear-gradient(var(--border-strong),var(--border-strong));
+  background-repeat:no-repeat;background-size:100% 1px;background-position:0 100%;
+  padding:1px 2px;
+}
+html[data-theme="teletype"] textarea.field{padding:4px 2px 1px}
+html[data-theme="teletype"] select.field{padding-right:18px}
+html[data-theme="teletype"] .field:focus,
+html[data-theme="teletype"] details.adv .row input:focus,
+html[data-theme="teletype"] details.adv .row textarea:focus{
+  border:0;outline:none;
+  background-image:linear-gradient(var(--accent),var(--accent)),linear-gradient(var(--accent),var(--accent));
+  background-repeat:no-repeat,no-repeat;
+  background-size:100% 1px,100% 1px;
+  background-position:0 calc(100% - 2px),0 100%;
+}
+html[data-theme="teletype"] .field:focus-visible,
+html[data-theme="teletype"] details.adv .row input:focus-visible,
+html[data-theme="teletype"] details.adv .row textarea:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+}
+html[data-theme="teletype"] .field::placeholder,
+html[data-theme="teletype"] details.adv .row input::placeholder{color:var(--text-muted);opacity:1}
+
+/* Select popup: the picker is a printed slip of the same stock, not a flat sheet.
+   The slip is exactly as wide as the closed control (`inline-size` follows
+   `anchor-size(width)` from app.css, and views.js sizes CONFIG to its longest
+   option), so a long config path is printed on the slip instead of clipping at
+   its right edge. The frame is the theme's 3px double rule (outer rule + inner
+   hairline) with the hard `3px 3px 0` offset shadow of a slip lying on the desk;
+   the paper ruling from `.app` runs under transparent option rows, dotted rules
+   cut the rows apart, and hover is the 10 % ink wash. Each row keeps a 3px left
+   gutter: transparent at rest, ribbon red on the checked row, whose ink slab
+   flips the text and the checkmark to inverse. The keyboard cursor prints the
+   2px square accent rule from app.css; the picker itself prints no ring and no
+   radius. */
+html[data-theme="teletype"] select.field::picker(select){
+  border:3px double var(--border-strong);border-radius:0;outline:none;
+  background-color:var(--canvas);
+  background-image:repeating-linear-gradient(0deg,var(--tint) 0 1px,transparent 1px 5px);
+  box-shadow:3px 3px 0 var(--rule);
+  padding:5px;margin-top:5px;
+  inline-size:anchor-size(width);
+  font-family:var(--font-mono);letter-spacing:var(--track-micro);line-height:var(--lh-data);
+}
+html[data-theme="teletype"] select.field option{
+  border:0;border-left:3px solid transparent;border-radius:0;
+  background-color:transparent;background-image:none;
+  color:var(--text-primary);
+  font-family:var(--font-mono);letter-spacing:var(--track-micro);
+  padding:4px 8px 4px 5px;
+}
+html[data-theme="teletype"] select.field option::checkmark{color:var(--accent)}
+html[data-theme="teletype"] select.field option+option{border-top:1px dotted var(--rule)}
+html[data-theme="teletype"] select.field option:hover:not(:checked),
+html[data-theme="teletype"] select.field option:focus:not(:checked){
+  background-color:var(--tint2);color:var(--text-primary);
+}
+html[data-theme="teletype"] select.field option:checked{
+  background-color:var(--text-primary);color:var(--text-inverse);
+  border-left-color:var(--accent);
+  font-weight:700;
+}
+html[data-theme="teletype"] select.field option:checked::checkmark{color:var(--text-inverse)}
+
+/* Segmented control: double frame. The active cell keeps its solid flip from
+   app.css in both modes. */
+html[data-theme="teletype"] .seg{border:3px double var(--border-strong)}
+html[data-theme="teletype"] .seg button{padding:0 8px;border-right:1px solid var(--rule)}
+html[data-theme="teletype"] .seg button:last-child{border-right:0}
+
+/* Every selected filter is an ink impression, including notebook and log
+   controls outside the knob-level strip. No new mark, rounding or texture. */
+html[data-theme="teletype"] .btn.on:not(.pri):not(.dngr):not(:disabled){
+  background:var(--ink);border-color:var(--ink);color:var(--paper);
+}
+html[data-theme="teletype"] :is(.mast button,.mast a.mini,.seg button,.knob-help-btn){appearance:none;box-shadow:none;text-transform:uppercase}
+html[data-theme="teletype"] .seg button.on{background:var(--ink);color:var(--paper)}
+html[data-theme="teletype"] .seg button:not(.on):not(:disabled):hover{background:var(--tint2);color:var(--ink)}
+html[data-theme="teletype"] .theme.on{border-color:var(--ink)}
+html[data-theme="teletype"] .csw input[type="color"]{appearance:none;background:none;border-color:var(--rule);border-radius:0;box-shadow:none}
+html[data-theme="teletype"] .csw input::-webkit-color-swatch-wrapper{padding:3px}
+html[data-theme="teletype"] .csw input::-webkit-color-swatch{border:1px solid var(--text-muted);border-radius:0}
+html[data-theme="teletype"] .csw input::-moz-color-swatch{border:1px solid var(--text-muted);border-radius:0}
+html[data-theme="teletype"] .led .red{color:var(--warn)}
+html[data-theme="teletype"] .seg button:disabled,
+html[data-theme="teletype"] .seg button:disabled:hover{background:none;color:var(--text-disabled);cursor:not-allowed}
+
+/* The runner sits inside the punched strip: give it the same 5 % ink wash as
+   .aside so the strip reads as one band (the app default is a solid --panel). */
+html[data-theme="teletype"] .runner{background:color-mix(in srgb,var(--ink) 5%,var(--paper))}
+
+/* Tables: receipt rules, a double rule under the header, and a row number
+   printed into the first cell by a counter (no DOM change). Tables that already
+   carry their own index inside a .box (doctor devices, resolved config) keep it
+   undecorated so the number never doubles up. */
+html[data-theme="teletype"] table.led{counter-reset:ledrow}
+html[data-theme="teletype"] table.led tbody tr{counter-increment:ledrow}
+html[data-theme="teletype"] table.led tbody td:first-child::before{
+  content:counter(ledrow,decimal-leading-zero);
+  display:inline-block;width:3ch;margin-right:6px;
+  color:var(--text-muted);font-size:var(--fs-10);font-weight:400;letter-spacing:0;
+}
+html[data-theme="teletype"] .box table.led tbody td:first-child::before{content:none}
+/* Inline editor rows (notebook form, queue override detail) are continuation
+   rows of the record above, never records of their own: leave them unnumbered. */
+html[data-theme="teletype"] table.led tbody tr.nb-form,
+html[data-theme="teletype"] table.led tbody tr.q-detail{counter-increment:none}
+html[data-theme="teletype"] table.led tbody tr.nb-form td:first-child::before,
+html[data-theme="teletype"] table.led tbody tr.q-detail td:first-child::before{content:none}
+html[data-theme="teletype"] .led th{border-bottom:3px double var(--border-strong);padding:3px 7px;font-weight:400}
+html[data-theme="teletype"] .led td{border-bottom:1px solid var(--rule)}
+
+/* Ledger: the key column sits on the monospace grid and the value column keeps
+   its natural width, so the dotted leader runs into the number; a heavier rule
+   closes every fifth row (the receipt subtotal). */
+html[data-theme="teletype"] .ledger td.k{width:14ch;padding-right:8px}
+html[data-theme="teletype"] .ledger td.v{width:1%;padding-left:8px}
+html[data-theme="teletype"] .ledger tr:nth-child(5n) td{border-bottom:1px solid var(--ink)}
+
+/* Status stamp: boxed uppercase frame with one outer line. Only the running
+   state takes the ribbon colour; the frame never tilts (views.js emits "runn"). */
+html[data-theme="teletype"] .st{
+  border-color:currentColor;line-height:1.4;padding:0 5px;
+  letter-spacing:var(--track-label);text-transform:uppercase;
+  outline:1px solid currentColor;outline-offset:1px;
+}
+html[data-theme="teletype"] .st.run,
+html[data-theme="teletype"] .st.runn{color:var(--status-run)}
+html[data-theme="teletype"] .st.stop,
+html[data-theme="teletype"] .st.done,
+html[data-theme="teletype"] .st.unkn,
+html[data-theme="teletype"] .st.unknown{color:var(--text-muted);border-color:var(--text-muted);outline-color:var(--text-muted)}
+
+/* Log panels: a sprocket gutter on both edges, pitch = log line height. */
+html[data-theme="teletype"] .logbox{
+  padding-left:15px;padding-right:15px;
+  background-image:
+    radial-gradient(circle at 7px 10px,var(--perf-hole) 1.6px,transparent 2.1px),
+    radial-gradient(circle at calc(100% - 9px) 10px,var(--perf-hole) 1.6px,transparent 2.1px);
+  background-repeat:repeat-y,repeat-y;
+  background-size:100% calc(var(--lh-log) * 1em),100% calc(var(--lh-log) * 1em);
+  background-position:0 0,0 0;
+}
+
+/* Status bar: totals line, digits right-aligned in a fixed field. */
+html[data-theme="teletype"] .foot{border-top:3px double var(--border-strong)}
+html[data-theme="teletype"] .foot b{display:inline-block;min-width:6ch;text-align:right;letter-spacing:0}
+
+/* Independent framed sheets share two registration corners, 3px inset.
+   Nested controls and unframed notes reuse their enclosing sheet's marks.
+   Do not replace the new-run header's sticky positioning. */
+html[data-theme="teletype"] :is(.box,.vhead,.pf-section-head.surface,.knobswork.surface,.readystrip.surface,.newrun-head.surface,.runs-bar.surface,.nb-filter.surface,.table-frame.surface,.alert.surface,.empty.surface,details.adv.surface):not(:is(.box,.surface) *):not(.vhead-sticky){position:relative}
+html[data-theme="teletype"] :is(.box,.vhead,.pf-section-head.surface,.knobswork.surface,.readystrip.surface,.newrun-head.surface,.runs-bar.surface,.nb-filter.surface,.table-frame.surface,.alert.surface,.empty.surface,details.adv.surface):not(:is(.box,.surface) *)::before,
+html[data-theme="teletype"] :is(.box,.vhead,.pf-section-head.surface,.knobswork.surface,.readystrip.surface,.newrun-head.surface,.runs-bar.surface,.nb-filter.surface,.table-frame.surface,.alert.surface,.empty.surface,details.adv.surface):not(:is(.box,.surface) *)::after{
+  content:"";position:absolute;width:6px;height:6px;pointer-events:none;
+}
+html[data-theme="teletype"] :is(.box,.vhead,.pf-section-head.surface,.knobswork.surface,.readystrip.surface,.newrun-head.surface,.runs-bar.surface,.nb-filter.surface,.table-frame.surface,.alert.surface,.empty.surface,details.adv.surface):not(:is(.box,.surface) *)::before{top:3px;left:3px;border-top:1px solid var(--rule);border-left:1px solid var(--rule)}
+html[data-theme="teletype"] :is(.box,.vhead,.pf-section-head.surface,.knobswork.surface,.readystrip.surface,.newrun-head.surface,.runs-bar.surface,.nb-filter.surface,.table-frame.surface,.alert.surface,.empty.surface,details.adv.surface):not(:is(.box,.surface) *)::after{right:3px;bottom:3px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+
+/* Empty state: the dashed frame and the title only. */
+html[data-theme="teletype"] .empty{border:1px dashed var(--rule)}
+
+/* Toast: a complete slip. Hard offset shadow only; the frame stays a whole box. */
+html[data-theme="teletype"] .toast{
+  padding:10px 12px 8px;
+  box-shadow:3px 3px 0 var(--rule);
+}
+
+/* Carbon low-glare pass: identical geometry and marks, ink and fills only.
+   The rest of the pattern already lives in app.css under html[data-dark="on"]
+   (nav slab, tab slab, seg slab, .pri fill); only the teletype differences stay
+   here: muted index, an ink hover frame, and a fill that flips to the tint
+   instead of a brightness filter. */
+html[data-theme="teletype"][data-mode="carbon"] .nav a.on .idx{color:var(--text-muted);opacity:1}
+html[data-theme="teletype"][data-mode="carbon"] .btn:hover,
+html[data-theme="teletype"][data-mode="carbon"] .mast button:hover,
+html[data-theme="teletype"][data-mode="carbon"] .mast a.mini:hover{
+  background:var(--tint2);color:var(--text-primary);border-color:var(--text-primary);
+}
+html[data-theme="teletype"][data-mode="carbon"] .btn.pri:hover{
+  background:var(--tint2);border-color:var(--accent);color:var(--text-primary);
+}
+html[data-theme="teletype"][data-mode="carbon"] .logbox{color:var(--log-text)}
+html[data-theme="teletype"][data-mode="carbon"] pre.chart{color:var(--log-text)}

@@ -1,0 +1,74 @@
+/* Bundled mono face: same metrics on Windows, Linux and macOS. */
+@font-face{font-family:"IBM Plex Mono";src:url("/assets/fonts/IBMPlexMono-Regular.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"IBM Plex Mono";src:url("/assets/fonts/IBMPlexMono-Medium.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:"IBM Plex Mono";src:url("/assets/fonts/IBMPlexMono-SemiBold.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap}
+@font-face{font-family:"IBM Plex Mono";src:url("/assets/fonts/IBMPlexMono-Bold.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap}
+
+/* Semantic tokens shared by every theme. Components only use var(--*). */
+:root{
+  --font-ui: "IBM Plex Mono", ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-mono: var(--font-ui);
+  /* Alarm ink. Neutral default keeps the historical accent colour so themes
+     without their own alarm hue are unchanged; teletype overrides it. */
+  --warn: var(--accent);
+  --scale: 1.1;
+  --fs-display: calc(22px * var(--scale));
+  --fs-h1: calc(15px * var(--scale));
+  --fs-h2: calc(14px * var(--scale));
+  --fs-h3: calc(12px * var(--scale));
+  --fs-body: calc(14px * var(--scale));
+  --fs-caption: calc(12px * var(--scale));
+  --fs-micro: calc(10px * var(--scale));
+  --fs-9: calc(9px * var(--scale));
+  --fs-10: calc(10px * var(--scale));
+  --fs-11: calc(11px * var(--scale));
+  --fs-12: calc(12px * var(--scale));
+  --fs-13: calc(13px * var(--scale));
+  --fs-14: calc(14px * var(--scale));
+  --fs-15: calc(15px * var(--scale));
+  --lh-body: 1.5;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-status: 0;
+  --surface-pad-x: 12px;
+  --surface-pad-y: 10px;
+  --view-top: 16px;
+  --border-w: 1px;
+  --row-h: 30px;
+  --gap-1: 4px;
+  --gap-2: 8px;
+  --gap-3: 14px;
+  --gap-4: 20px;
+  --dur-fast: 90ms;
+  --dur-base: 160ms;
+  --dur-slow: 240ms;
+  --ease: cubic-bezier(.2,.7,.3,1);
+  --shadow-panel: none;
+  --shadow-focus: none;
+  --motion: 1;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  padding:0;
+  overflow:hidden;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-ui);
+  font-size:var(--fs-body);
+  line-height:var(--lh-body);
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:inherit}
+::selection{background:var(--ink);color:var(--paper)}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--rule)}
+::-webkit-scrollbar-thumb:hover{background:var(--dim)}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}

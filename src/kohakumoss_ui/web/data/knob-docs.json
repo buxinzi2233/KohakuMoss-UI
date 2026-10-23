@@ -1,0 +1,785 @@
+{
+  "version": 1,
+  "generated_from": [
+    "docs/zh-CN/guides/configs.md",
+    "docs/zh-CN/concepts/*.md",
+    "docs/zh-CN/guides/{datasets,logging,multi-gpu,weights}.md",
+    "scripts/train/moss.py"
+  ],
+  "sections": {
+    "MODEL": {
+      "en": "What the model is built from: weight files, architecture variant and the text/VAE encoders.",
+      "zh": "模型来源：权重文件、架构变体与文本/VAE 编码器。"
+    },
+    "DATA": {
+      "en": "The data layer: dataset lists, batching and token budget, caching, captions and augmentation.",
+      "zh": "数据层：数据集清单、批次与词元预算、缓存、打标与增强。"
+    },
+    "ADAPTER": {
+      "en": "Which adapter algorithm is trained, where it attaches, how it is scaled and whether full FT runs.",
+      "zh": "训练哪种适配器、挂到哪些层、如何缩放，以及是否全量微调。"
+    },
+    "OBJECTIVE": {
+      "en": "The training objective: timestep sampling, loss function and loss weighting.",
+      "zh": "训练目标：时间步采样、损失函数与损失加权。"
+    },
+    "OPTIM": {
+      "en": "Optimizer choice, learning rate and schedule, clipping, weight decay and EMA.",
+      "zh": "优化器选择、学习率与调度、梯度裁剪、权重衰减与 EMA。"
+    },
+    "PRECISION": {
+      "en": "Compute precision, the modules kept in fp32, and the fp16 numerical fixes.",
+      "zh": "计算精度、保持 fp32 的模块，以及 fp16 数值修复。"
+    },
+    "MEMORY": {
+      "en": "Memory placement: the profiled offload and streaming plan for weights, activations and optimiser state.",
+      "zh": "内存放置：权重、激活与优化器状态的卸载和流式计划。"
+    },
+    "PARALLEL": {
+      "en": "Multi-GPU layout (ddp, fsdp, pipeline, threaded) plus communication backend and timeouts.",
+      "zh": "多卡布局（ddp、fsdp、pipeline、threaded）与通信后端、超时。"
+    },
+    "KERNELS": {
+      "en": "Kernel selection, the autotuning policy, the retune window and the torch.compile scope.",
+      "zh": "内核选择、自动调优策略、重调窗口与 torch.compile 范围。"
+    },
+    "RUNTIME": {
+      "en": "The run driver, step count, gradient accumulation and where the outputs land.",
+      "zh": "运行驱动、总步数、梯度累积与产出目录。"
+    },
+    "LOGGING": {
+      "en": "What gets reported: sinks, intervals, progress bar, non-finite patience and profiling windows.",
+      "zh": "日志输出：接收端、间隔、进度条、非有限容忍与性能采样窗口。"
+    },
+    "SAMPLING": {
+      "en": "In-training preview sampling and the held-out validation pass.",
+      "zh": "训练中的预览采样，以及留出集验证。"
+    },
+    "CHECKPOINT / EXPORT": {
+      "en": "Checkpoint cadence and retention, resume, and the ComfyUI / HF export layout.",
+      "zh": "检查点保存节奏与保留数、恢复，以及 ComfyUI / HF 导出布局。"
+    }
+  },
+  "knobs": {
+    "WEIGHTS": {
+      "en": "Base model root: ComfyUI models folder, HF pipeline dir, or one DiT file. Point it at your downloaded checkpoint first.",
+      "zh": "基础模型的根目录：ComfyUI models 文件夹、HF 流水线目录或单个 DiT 文件。首次配置或换底模时改这里。",
+      "doc": "docs/zh-CN/guides/weights.md#comfyui-布局"
+    },
+    "VARIANT": {
+      "en": "Picks the base or sft model variant, and with it the default ComfyUI DiT file. Change it when you switch to SFT weights.",
+      "zh": "选择 base 或 sft 底模变体，同时决定默认加载哪个 ComfyUI DiT 文件。换用 SFT 权重时改。",
+      "doc": "docs/zh-CN/guides/weights.md#comfyui-布局"
+    },
+    "ARCH_OVERRIDES": {
+      "en": "Overrides fields of MossArchConfig. Set it only for experimental architectures or to debug an arch mismatch.",
+      "zh": "覆盖 MossArchConfig 的架构字段。只在实验性结构或排查架构不匹配时设置。",
+      "doc": "scripts/train/moss.py#L16"
+    },
+    "TRANSFORMER": {
+      "en": "Names the DiT file; empty picks the first match under WEIGHTS. Set it to use the bf16 DiT instead of the int8 one.",
+      "zh": "指定 DiT 文件；留空按 WEIGHTS 里的顺序挑。想用 bf16 而非 int8 的 DiT 时改。",
+      "doc": "docs/zh-CN/guides/weights.md#comfyui-布局"
+    },
+    "TEXT_ENCODER": {
+      "en": "Text-encoder file or Qwen3.5 dir; empty uses the WEIGHTS default. Set it to swap the encoder file or its precision.",
+      "zh": "文本编码器文件或 Qwen3.5 目录；留空用 WEIGHTS 里的默认文件。换文件或换精度时改。",
+      "doc": "docs/zh-CN/guides/weights.md#comfyui-布局"
+    },
+    "TEXT_DEVICE": {
+      "en": "GPU that runs the text encoder; empty follows the training device. Move it to another GPU when VRAM is tight.",
+      "zh": "文本编码器跑在哪块卡；留空跟随训练设备。显存吃紧时把它挪到另一块 GPU。",
+      "doc": "docs/zh-CN/internals/text-encoder.md#textencoderplan"
+    },
+    "TEXT_ENCODE": {
+      "en": "Text-encoder placement: memory mode, dtype, precision, batch, layout. Tune it when VRAM is tight.",
+      "zh": "文本编码器的放置方案：显存模式、精度、批次与布局。显存紧张或预计算缓存时调它。",
+      "doc": "docs/zh-CN/internals/text-encoder.md#textencoderplan"
+    },
+    "VAE": {
+      "en": "VAE file or folder; empty uses the one under WEIGHTS. Set it when you swap the VAE or it lives outside the default spot.",
+      "zh": "VAE 文件或目录；留空时用 WEIGHTS 里的 vae。换 VAE 或它不在默认位置时改。",
+      "doc": "docs/zh-CN/guides/weights.md#comfyui-布局"
+    },
+    "VAE_ENCODE": {
+      "en": "VAE placement plan: memory mode and chunking. Tune it to save VRAM or to speed up latent encoding.",
+      "zh": "VAE 的放置方案：显存模式与分块粒。想省显存或加快潜变量编码时调它。",
+      "doc": "docs/zh-CN/internals/offload.md#vae"
+    },
+    "VAE_DTYPE": {
+      "en": "VAE compute dtype; auto picks bf16 where supported. Pin it by hand on older GPUs or when you need full fidelity.",
+      "zh": "VAE 计算精度；auto 在支持 bf16 的卡上用 bf16。老卡或要更高保真时手动指定。",
+      "doc": "docs/zh-CN/concepts/numerics.md#pytorch-默认设置"
+    },
+    "TRAIN_TEXT_REFINER": {
+      "en": "Also trains the two text-refiner blocks. They stay frozen by default; enable it to sharpen prompt following.",
+      "zh": "让适配器（或全量微调）也训练两个文本细化块。默认冻结，想强化提示词理解时打开。",
+      "doc": "docs/zh-CN/guides/full-finetune.md#全量微调"
+    },
+    "DATASETS": {
+      "en": "List of dataset entries, each with a source and its arguments. Change it to swap datasets or blend several with weights.",
+      "zh": "数据集条目列表，每项含 source 与数据源参数。换训练集或按权重混合多个数据集时改。",
+      "doc": "docs/zh-CN/concepts/data.md#数据集条目"
+    },
+    "RESOLUTION_MODE": {
+      "en": "Target-size rule: aspect-preserving resize, buckets, shifted or centered square crop. Change it to alter framing.",
+      "zh": "目标尺寸的算法：保比例缩放、宽高比桶、偏移方图或中心裁剪。想换训练构图策略时改。",
+      "doc": "docs/zh-CN/concepts/data.md#分辨率批次划分与超长样本"
+    },
+    "TARGET_AREA": {
+      "en": "Target pixel area per image, which sets image tokens and VRAM. Lower it for small GPUs or a coarser resolution.",
+      "zh": "每张图的目标像素面积，决定图像词元数与显存占用。显存不够或想降分辨率时调小。",
+      "doc": "docs/zh-CN/concepts/data.md#目标尺寸resolution_mode"
+    },
+    "SIZE_STEP": {
+      "en": "Pixel multiple every side must align to (16 = VAE /8 times patchify 2). Leave it alone unless the architecture changes.",
+      "zh": "所有边长的对齐单位（16 = VAE /8 再 patchify 2）。除非改架构，一般不需要动。",
+      "doc": "docs/zh-CN/concepts/data.md#分辨率批次划分与超长样本"
+    },
+    "ASPECT_RANGE": {
+      "en": "Allowed width/height range; out-of-range images get cropped to the bound. Tighten it when a dataset has extreme shapes.",
+      "zh": "允许的宽高比范围，超出的图会被裁到边界。数据集里有极端长图时收紧。",
+      "doc": "docs/zh-CN/concepts/data.md#目标尺寸resolution_mode"
+    },
+    "UPSCALE": {
+      "en": "Whether images smaller than the target get upscaled; never keeps them native. Keep never to avoid inventing pixels.",
+      "zh": "是否放大小于目标的图；never 保留原始尺寸。小图数据集不想被插值时保持 never。",
+      "doc": "docs/zh-CN/concepts/data.md#目标尺寸resolution_mode"
+    },
+    "BATCHING": {
+      "en": "How batches are built: greedy token packing, first-fit packing, or fixed sample count. Tune for VRAM use and step time.",
+      "zh": "批次划分方式：按词元贪心拼接、首次适应装桶，或固定样本数。调显存利用率与步时。",
+      "doc": "docs/zh-CN/concepts/data.md#目标尺寸resolution_mode"
+    },
+    "MAX_TOKENS": {
+      "en": "Joint token cap (image + text) per batch per rank; it drives VRAM and throughput. The main VRAM knob.",
+      "zh": "每批每卡的联合词元上限（图像+文本），直接决定显存与吞吐。最常用的显存旋钮。",
+      "doc": "docs/zh-CN/concepts/data.md#批次划分batching"
+    },
+    "OVERLONG": {
+      "en": "Samples over MAX_TOKENS: drop them, truncate text, or drop image tokens. Change it when long images are common.",
+      "zh": "超出 MAX_TOKENS 的样本怎么处理：丢弃、截断文本或随机丢图像词元。长图多时改。",
+      "doc": "docs/zh-CN/concepts/data.md#规划时的文本词元token_budget"
+    },
+    "BATCH_SIZE": {
+      "en": "Samples per batch per rank when BATCHING=count. Switch to the count mode before tuning it.",
+      "zh": "BATCHING=count 时每批每卡的样本数。先切到按数量分批，再调它。",
+      "doc": "docs/zh-CN/concepts/data.md#批次划分batching"
+    },
+    "MAX_SAMPLES": {
+      "en": "Cap on samples in one token batch; 0 means no cap. Set it when short samples would otherwise pack too densely.",
+      "zh": "单个词元批次的样本数上限，0 表示不限。短样本把批次塞得过密时设它。",
+      "doc": "docs/zh-CN/concepts/data.md#批次划分batching"
+    },
+    "TOKEN_BUDGET": {
+      "en": "How text tokens are known while planning: char estimate, render, or cached lengths only. Use exact for hard limits.",
+      "zh": "规划时如何得到文本词元数：按字符估算、逐条渲染，或只用缓存长度。要硬上限时用 exact。",
+      "doc": "docs/zh-CN/concepts/data.md#批次划分batching"
+    },
+    "CAPTION": {
+      "en": "Caption template: tag order, kept fields, shuffling, dropping. Change it to match your caption style or quality tags.",
+      "zh": "描述文本模板：标签顺序、保留字段、是否打乱与丢弃。换标注风格或质量词策略时改。",
+      "doc": "docs/zh-CN/concepts/data.md#数据集条目"
+    },
+    "TEXT_DROP": {
+      "en": "Chance a sample uses the empty-prompt embedding, the unconditional branch for CFG. Raise it if CFG output is weak.",
+      "zh": "每条样本改用空提示词嵌入的概率，即 CFG 的无条件分支。CFG 效果差时提高。",
+      "doc": "docs/zh-CN/concepts/data.md#描述文本"
+    },
+    "LATENT_CACHE": {
+      "en": "Latent cache mode: off, precomputed offline, or written during training. Precompute to skip VAE work in the loop.",
+      "zh": "潜变量缓存模式：不用、离线预计算或训练时在线写入。离线可省去训练中的 VAE 开销。",
+      "doc": "docs/zh-CN/concepts/data.md#缓存"
+    },
+    "TEXT_CACHE": {
+      "en": "Text-embedding cache mode: off, offline, or online. Offline takes text encoding out of the training loop entirely.",
+      "zh": "文本嵌入缓存模式：off、离线或在线。离线可让训练循环完全不做文本编码。",
+      "doc": "docs/zh-CN/concepts/data.md#缓存"
+    },
+    "CACHE_DIR": {
+      "en": "Where latent and text vaults live; empty uses the dataset's cache folder. Set it to share one cache across datasets.",
+      "zh": "潜变量与文本缓存的存放目录，留空用数据集下的 cache。多数据集共享缓存时指定。",
+      "doc": "docs/zh-CN/concepts/data.md#缓存"
+    },
+    "CACHE_DTYPE": {
+      "en": "Storage precision of cached latents and text (bf16/fp16/fp32/fp8). Lower it to save disk, raise it for fidelity.",
+      "zh": "缓存中潜变量与文本的存储精度。想省磁盘降档，要更高保真时升档。",
+      "doc": "scripts/train/moss.py#L62"
+    },
+    "CAPTION_VARIANTS": {
+      "en": "How many caption renderings per image are cached and sampled from. Raise it to make training robust to caption order.",
+      "zh": "每张图缓存并轮流抽取多少套描述变体。想增强对标注顺序的鲁棒性时增加。",
+      "doc": "docs/zh-CN/concepts/data.md#描述文本"
+    },
+    "FLIP": {
+      "en": "Turns on horizontal-flip augmentation. Leave it off for faces, text, or any left-right sensitive subject.",
+      "zh": "开启水平翻转数据增强。人像、文字或方向敏感的题材不要打开。",
+      "doc": "scripts/train/moss.py#L64"
+    },
+    "CROP": {
+      "en": "Crop placement: fixed center or random. Random generalizes better, but offline latent caches require center.",
+      "zh": "裁剪位置：固定中心或随机。随机更耐构图，但离线潜变量缓存必须用 center。",
+      "doc": "docs/zh-CN/concepts/data.md#目标尺寸resolution_mode"
+    },
+    "PLANNER_KWARGS": {
+      "en": "Overrides planner arguments such as window and drop_last. Use it when the derived defaults do not fit your data.",
+      "zh": "覆盖规划器参数（window、drop_last 等）。默认推导值不适合你的数据时改。",
+      "doc": "docs/zh-CN/concepts/data.md#数据配置项"
+    },
+    "LATENT_ENCODER_ID": {
+      "en": "VAE identity in the latent cache key. Change it together with the VAE, or old latents get reused wrongly.",
+      "zh": "潜变量缓存键里的 VAE 标识。换 VAE 必须同步改，否则会错用旧缓存。",
+      "doc": "docs/zh-CN/concepts/data.md#数据配置项"
+    },
+    "LATENT_DRAW": {
+      "en": "How the VAE draws latents: the mode or a sample; part of the cache key. Keep mode for deterministic latents.",
+      "zh": "VAE 取潜变量的方式：用众数还是采样，它也是缓存键的一部分。要确定性时用 mode。",
+      "doc": "docs/zh-CN/concepts/data.md#数据配置项"
+    },
+    "TEXT_ENCODER_ID": {
+      "en": "Text-encoder identity in the text cache key. Update it whenever the text encoder or its precision changes.",
+      "zh": "文本缓存键里的编码器标识。换文本编码器或改精度时必须同步改。",
+      "doc": "docs/zh-CN/concepts/data.md#数据配置项"
+    },
+    "BACKGROUND": {
+      "en": "Fill colour for images with transparency. Change it when the dataset includes alpha PNGs on a dark background.",
+      "zh": "透明图的填充底色。数据集含带 alpha 的 PNG 时按画面需要改。",
+      "doc": "docs/zh-CN/concepts/data.md#数据配置项"
+    },
+    "RESAMPLE": {
+      "en": "Resize filter used when scaling images (lanczos and friends). Swap it for sharper or softer resampling.",
+      "zh": "缩放图像时用的重采样滤镜（lanczos 等）。想要更锐或更柔的边缘时换。",
+      "doc": "docs/zh-CN/concepts/data.md#数据配置项"
+    },
+    "TEXT_CHARS_PER_TOKEN": {
+      "en": "Characters per token used when no cached length exists. Lower it for Chinese or Japanese captions.",
+      "zh": "没有缓存长度时，按每词元多少字符估算文本。中/日文标注占比高时下调。",
+      "doc": "docs/zh-CN/concepts/data.md#规划时的文本词元token_budget"
+    },
+    "TEXT_OVERHEAD_TOKENS": {
+      "en": "Chat-template tokens added to every caption estimate. Adjust it when the prompt template or tokenizer changes.",
+      "zh": "每条描述估算时额外加上的模板词元数。换提示词模板或分词器时微调。",
+      "doc": "docs/zh-CN/concepts/data.md#规划时的文本词元token_budget"
+    },
+    "MAX_TEXT_TOKENS": {
+      "en": "Cap on one caption's text tokens while planning. Raise it when long captions keep getting cut short.",
+      "zh": "规划时单条描述允许的最大词元数。长标注被截得太狠时提高。",
+      "doc": "docs/zh-CN/concepts/data.md#规划时的文本词元token_budget"
+    },
+    "PREFETCH": {
+      "en": "Batches each loader worker prefetches. Raise it if the GPU starves for data, lower it to save host memory.",
+      "zh": "每个加载器 worker 预取的批数。GPU 等数据时提高，主机内存紧时降低。",
+      "doc": "docs/zh-CN/concepts/data.md#数据配置项"
+    },
+    "PIN_MEMORY": {
+      "en": "Pins host batches so device copies run asynchronously. Turn it off when host memory is scarce.",
+      "zh": "把主机批次放进锁页内存以异步拷贝到显卡。主机内存紧张时可以关掉。",
+      "doc": "docs/zh-CN/concepts/data.md#数据配置项"
+    },
+    "NUM_WORKERS": {
+      "en": "Loader worker processes; each imports torch and costs host memory. Tune it for decode speed versus RAM.",
+      "zh": "数据加载 worker 进程数，每个都会导入 torch 占内存。在解码速度与主机内存间权衡。",
+      "doc": "docs/zh-CN/guides/configs.md#主机-ram"
+    },
+    "DATA_RESCAN": {
+      "en": "How the catalog cache rescans: incremental, full re-probe, or none. Touch it after adding or removing images.",
+      "zh": "目录缓存如何重新扫描：增量、全量重探或不遍历。增删图片文件后才需要动它。",
+      "doc": "docs/zh-CN/concepts/data.md#目录缓存"
+    },
+    "DATA_SCAN_WORKERS": {
+      "en": "Processes probing image headers during a (re)scan. Raise it when the first scan of a big folder is slow.",
+      "zh": "（重新）扫描时探测图像头的进程数。大目录首次扫描太慢时提高。",
+      "doc": "docs/zh-CN/concepts/data.md#目录缓存"
+    },
+    "DATA_WAIT": {
+      "en": "Seconds a non-writer rank waits for the catalog writer. Increase it only when catalog builds are slow on many ranks.",
+      "zh": "非写入 rank 等待目录写入者完成的最长秒数。多卡下目录构建慢时才加。",
+      "doc": "docs/zh-CN/concepts/data.md#目录缓存"
+    },
+    "SEED": {
+      "en": "Global seed for init, noise and batch order. Pin it to reproduce a run or to compare hyperparameters fairly.",
+      "zh": "全局随机种子，决定初始化、噪声与批次顺序。复现实验或做对比时固定。",
+      "doc": "docs/zh-CN/concepts/training.md#构建顺序"
+    },
+    "ALGO": {
+      "en": "Adapter algorithm: lora, locon, loha, lokr, oft; full means full fine-tuning. Change it to switch the training style.",
+      "zh": "适配器算法：LoRA/LoCon/LoHa/LoKr/OFT 等，full 表示全量微调。换训练方式或换算法时改。",
+      "doc": "docs/zh-CN/concepts/adapters.md#配置项"
+    },
+    "PRESET": {
+      "en": "Which linear layers get the adapter: attn, attn-mlp, full-block or all, plus modifiers. Widen or narrow the reach here.",
+      "zh": "适配器加在哪些线性层：attn、attn-mlp、full-block、all，可加修饰符。要放窄或放大范围时改。",
+      "doc": "docs/zh-CN/concepts/adapters.md#配置项"
+    },
+    "DIM": {
+      "en": "Adapter rank; on LoKr and OFT it is the block-size cap instead. Raise it for capacity, lower it to fight overfitting.",
+      "zh": "适配器秩；LoKr 与 OFT 下含义是块大小上限。容量不够时提高，过拟合时降低。",
+      "doc": "docs/zh-CN/concepts/adapters.md#配置项"
+    },
+    "ALPHA": {
+      "en": "Adapter scaling alpha; together with DIM it sets the effective update strength. Retune it whenever you change the rank.",
+      "zh": "适配器缩放 alpha，与 DIM 一起决定有效更新强度。改秩后通常要同步调整。",
+      "doc": "docs/zh-CN/concepts/adapters.md#配置项"
+    },
+    "ALGO_KWARGS": {
+      "en": "Extra LyCORIS module arguments such as LoKr's factor, passed through as-is. Use it for algorithm-level tuning.",
+      "zh": "透传给 LyCORIS 模块构造函数的额外参数，如 LoKr 的 factor。需要算法级微调时用。",
+      "doc": "docs/zh-CN/concepts/adapters.md#配置项"
+    },
+    "DORA": {
+      "en": "Enables DoRA weight decomposition (LyCORIS weight_decompose). Turn it on to get more quality out of a small rank.",
+      "zh": "启用 DoRA 权重分解（LyCORIS 的 weight_decompose）。小秩想提升质量时打开。",
+      "doc": "docs/zh-CN/guides/configs.md#算法参数"
+    },
+    "DORA_DETACH": {
+      "en": "Detaches the DoRA weight norm in training, using LyCORIS's unfused path. Use it to debug DoRA numerics.",
+      "zh": "训练时分离 DoRA 的权重范数，走 LyCORIS 未融合路径。排查 DoRA 数值时用。",
+      "doc": "docs/zh-CN/concepts/adapters.md#配置项"
+    },
+    "DROPOUT": {
+      "en": "The three dropouts: input, rank and module level. Raise them against overfitting, lower them when underfitting.",
+      "zh": "三种 dropout：输入级、秩级与模块级。过拟合时提高，欠拟合时降低。",
+      "doc": "docs/zh-CN/concepts/adapters.md#配置项"
+    },
+    "ADAPTER_MODE": {
+      "en": "Bypass add-on or one GEMM over W+dW. Merge saves inference math; quantized or streamed bases must stay bypass.",
+      "zh": "旁路叠加还是对 W+dW 做一次 GEMM。merge 省推理算力，量化或流式底座必须 bypass。",
+      "doc": "docs/zh-CN/concepts/adapters.md#配置项"
+    },
+    "LORAPLUS_RATIO": {
+      "en": "LoRA+ learning-rate ratio between the up and down factors. Set it above 1 so the factors converge at different speeds.",
+      "zh": "LoRA+ 里 up/down 因子的学习率比例。想让两个因子异步收敛时调到 1 以上。",
+      "doc": "docs/zh-CN/concepts/adapters.md#配置项"
+    },
+    "TRAIN_NORMS": {
+      "en": "Also trains deltas on the normalization layers the preset covers. Enable it when style transfer needs a stronger push.",
+      "zh": "同时训练预设覆盖的归一化层上的增量。风格迁移需要更强干预时打开。",
+      "doc": "docs/zh-CN/concepts/adapters.md#配置项"
+    },
+    "TIMESTEP": {
+      "en": "Timestep sampler: moss (the technical-report scheme), uniform or logit_normal. Use it to reshape the sigma spread.",
+      "zh": "时间步采样器：moss（技术报告方案）、uniform 或 logit_normal。想换训练分布时改。",
+      "doc": "docs/zh-CN/concepts/training.md#时间步采样器"
+    },
+    "TIMESTEP_KWARGS": {
+      "en": "Sampler parameters: mu, s, shift, cutoff and the uniform share. Tune them to nudge the sampled sigma distribution.",
+      "zh": "时间步采样器的参数：mu、s、shift、cutoff 与 uniform 占比。微调 sigma 分布时用。",
+      "doc": "scripts/train/moss.py#L102"
+    },
+    "LOSS": {
+      "en": "Loss function: mse, huber, l1, or masked_mse when a per-token mask exists. Switch it to be robust to outliers.",
+      "zh": "损失函数：mse、huber、l1，或需要逐词元掩码的 masked_mse。要抗离群值时换。",
+      "doc": "docs/zh-CN/concepts/training.md#目标函数"
+    },
+    "LOSS_KWARGS": {
+      "en": "Extra arguments for the chosen loss, such as huber's delta. Use it when the loss default is too coarse.",
+      "zh": "所选损失的额外参数，如 huber 的 delta。损失默认参数太粗时用来细调。",
+      "doc": "scripts/train/moss.py#L110"
+    },
+    "WEIGHTING": {
+      "en": "Multiplies a sigma-dependent weight onto the loss: none is the MOSS scheme, x0 and eps match other spaces.",
+      "zh": "把依赖 sigma 的权重乘到损失上：none 是 MOSS 方案，x0/eps 对应其他目标空间。",
+      "doc": "docs/zh-CN/concepts/training.md#目标函数"
+    },
+    "OPTIMIZER": {
+      "en": "Optimizer: adamw, adamw16, 8-bit variants, muon, prodigy and friends. Change it for memory or convergence behaviour.",
+      "zh": "优化器算法与实现：adamw、adamw16、8bit 变体、muon、prodigy 等。换显存策略或收敛方式时改。",
+      "doc": "docs/zh-CN/concepts/training.md#优化器"
+    },
+    "OPTIMIZER_KWARGS": {
+      "en": "Optimizer-specific arguments such as adamw16 rounding or muon momentum, validated per builder.",
+      "zh": "优化器自身参数，如 adamw16 的 rounding、muon 的 momentum，按算法校验后透传。",
+      "doc": "docs/zh-CN/concepts/training.md#优化器"
+    },
+    "LR": {
+      "en": "Base learning rate, the starting point for every parameter group. The first thing to retune after rank or data changes.",
+      "zh": "基础学习率，所有参数组的起点。换秩、换数据集或换算法后最该重调的项。",
+      "doc": "docs/zh-CN/concepts/training.md#训练"
+    },
+    "BETAS": {
+      "en": "Adam/AdamW first and second moment coefficients. Nudge them when gradients live at a different noise scale.",
+      "zh": "Adam/AdamW 的一阶与二阶动量系数。梯度噪声尺度变化时微调。",
+      "doc": "docs/zh-CN/concepts/training.md#优化器"
+    },
+    "EPS": {
+      "en": "Optimizer epsilon that guards the division. Only touch it when low-precision training starts producing NaNs.",
+      "zh": "优化器的 epsilon，防止除零。低精度训练开始出 NaN 时才考虑调。",
+      "doc": "docs/zh-CN/concepts/training.md#优化器"
+    },
+    "WEIGHT_DECAY": {
+      "en": "Weight-decay strength; WD_RULES decides which tensors it touches. Tune it to control drift and overfitting.",
+      "zh": "权重衰减强度，作用范围由 WD_RULES 决定。想控制漂移或过拟合时调。",
+      "doc": "docs/zh-CN/concepts/training.md"
+    },
+    "WD_RULES": {
+      "en": "Which tensors weight decay touches: moss only 2-D weights, none, or all. Change it for unusual regularization needs.",
+      "zh": "权重衰减的作用范围：moss 只碰二维权重，none 关闭，all 全部。需要非常规正则时改。",
+      "doc": "docs/zh-CN/concepts/training.md#优化器"
+    },
+    "SCHEDULE": {
+      "en": "Learning-rate schedule: mode, warmup steps and end step; end -1 means STEPS. Change it for another curve or warmup.",
+      "zh": "学习率调度：模式、预热步数、结束步，end 为 -1 表示用 STEPS。换曲线或改预热时调。",
+      "doc": "docs/zh-CN/concepts/training.md#优化器"
+    },
+    "GRAD_CLIP": {
+      "en": "Global gradient-norm clip; each step is scaled by the previous norm. Lower it only when gradients blow up.",
+      "zh": "全局梯度范数裁剪阈值，用上一步范数缩放当步梯度。梯度爆炸时才需要调小。",
+      "doc": "docs/zh-CN/concepts/training.md#融合更新"
+    },
+    "EMA": {
+      "en": "Exponential moving average of the weights; 0 turns it off. Enable it for steadier sampling weights in full fine-tunes.",
+      "zh": "参数的指数移动平均系数，0 表示关闭。全量微调想要更稳的采样权重时打开。",
+      "doc": "docs/zh-CN/concepts/training.md#构建顺序"
+    },
+    "PRECISION": {
+      "en": "Compute precision for forward and backward: bf16, fp16 or auto. Switch to fp16 on GPUs without bf16 support.",
+      "zh": "前向与反向的计算精度：bf16、fp16 或 auto。显卡不支持 bf16 时切 fp16。",
+      "doc": "docs/zh-CN/concepts/numerics.md"
+    },
+    "KEEP_FP32": {
+      "en": "Modules kept in fp32: time embedding, shared modulation, output-head modulation. Add entries when they go unstable.",
+      "zh": "保持 fp32 的模块：时间嵌入、共享调制、输出头调制。这些模块数值不稳时可再加。",
+      "doc": "docs/zh-CN/concepts/model.md#调用约定"
+    },
+    "FP16_FIX": {
+      "en": "The fp16 numerical fix: none, online runtime factors, or fp32_residual. Pick one when fp16 training overflows.",
+      "zh": "fp16 数值修复：none、online 运行时因子或 fp32_residual。fp16 训练溢出时选一种。",
+      "doc": "docs/zh-CN/concepts/numerics.md#数值计算"
+    },
+    "FP16_FIX_KWARGS": {
+      "en": "Arguments for the fp16 fix, such as the online scaling factor c. Tune the scaling when the default fix is not enough.",
+      "zh": "fp16 修复的参数，如 online 模式的缩放系数 c。默认修复不够时微调缩放。",
+      "doc": "docs/zh-CN/guides/configs.md#质量测试配置"
+    },
+    "MEMORY_PROFILE": {
+      "en": "Memory-placement catalog profile: speed, balanced, low, minimal, auto, manual. Pick one before tuning offload knobs.",
+      "zh": "内存放置配置档：speed/balanced/low/minimal/auto 等。先选档再手调。",
+      "doc": "docs/zh-CN/concepts/profiles.md#内存配置档"
+    },
+    "MEMORY_AUTO_FORCE": {
+      "en": "In auto mode with no profile that fits: False errors out, True runs the last one anyway with a warning.",
+      "zh": "auto 模式下无档装得下时：False 报错，True 硬跑最后一档并记 WARNING。",
+      "doc": "docs/zh-CN/concepts/profiles.md#auto"
+    },
+    "STEP_RELEASE": {
+      "en": "Releases free cached device memory between steps: none, empty_cache every step (synchronises), or every N steps.",
+      "zh": "步间释放空闲的缓存显存：none、每步 empty_cache（会同步）或每 N 步一次。",
+      "doc": "docs/zh-CN/concepts/profiles.md#释放缓存内存"
+    },
+    "CHECKPOINT": {
+      "en": "Gradient checkpointing: which activations backward recomputes. none, block, sub-block, selective, partial:<fraction>.",
+      "zh": "梯度检查点：决定反向重算哪些激活，none、block、sub-block、selective 等。",
+      "doc": "docs/zh-CN/concepts/profiles.md#内存配置项"
+    },
+    "STREAM": {
+      "en": "Block weights live on host and stream in: off (resident), ring (frozen base), swap (trainable full-FT masters).",
+      "zh": "块权重放主机再流式传入：off 常驻、ring 冻结基座、swap 可训练主副本。",
+      "doc": "docs/zh-CN/concepts/profiles.md#内存配置项"
+    },
+    "STREAM_RESIDENT": {
+      "en": "Device block slots kept resident while streaming, at least 2. Raise it to trade VRAM for fewer host transfers.",
+      "zh": "流式传输时保留在设备上的块槽数，至少 2。调大用显存换更少的主机搬运。",
+      "doc": "docs/zh-CN/internals/offload.md#权重流式传输"
+    },
+    "PINNED": {
+      "en": "Uses pinned host memory for every offload; False falls back to pageable buffers with staged copies.",
+      "zh": "所有卸载都用锁页主机内存；False 退回可分页缓冲区加中转拷贝。",
+      "doc": "docs/zh-CN/concepts/profiles.md#内存配置项"
+    },
+    "ACT_OFFLOAD": {
+      "en": "Saved activations move to pinned host memory and are prefetched a block ahead. Enable it when activations dominate VRAM.",
+      "zh": "保存的激活移入锁页主机内存并提前一块预取。激活占显存大头时打开。",
+      "doc": "docs/zh-CN/concepts/profiles.md#内存配置项"
+    },
+    "OPTIM_STATE": {
+      "en": "AdamW state placement only: gpu, stream (host state, GPU update) or cpu (host update). Other optimizers stay on gpu.",
+      "zh": "只控制 AdamW 状态放置：gpu、stream（主机状态、GPU 上更新）、cpu（主机更新）。",
+      "doc": "docs/zh-CN/concepts/training.md#优化器"
+    },
+    "GRAD_OFFLOAD": {
+      "en": "Gradients leave the device after accumulation and are summed over GRAD_ACC micro-batches in fp32 host memory.",
+      "zh": "梯度累积后立即离开设备，在 fp32 主机内存里对 GRAD_ACC 个微批次求和。",
+      "doc": "docs/zh-CN/concepts/training.md"
+    },
+    "FUSED_STEP": {
+      "en": "Runs the per-parameter optimizer update inside backward. Rejected with muon; saves the separate step buffers.",
+      "zh": "在反向内部完成逐参数优化器更新。与 muon 互斥，省掉独立的一步缓冲。",
+      "doc": "docs/zh-CN/concepts/training.md#融合更新"
+    },
+    "BASE_PRECISION": {
+      "en": "How the frozen base is stored: auto, compute, int8, fp8, fp8_compute, mxfp8, quant. Full FT needs compute.",
+      "zh": "冻结基座存储方式：auto、compute、fp8_compute 等；全量微调要用 compute。",
+      "doc": "docs/zh-CN/concepts/profiles.md#精度配置项"
+    },
+    "FP8_RECIPE": {
+      "en": "Scaling granularity for fp8_compute: tensor, row or block. Finer costs extra scale factors but holds accuracy.",
+      "zh": "fp8_compute 的缩放粒度：tensor、row、block。越细越准，但要多存缩放因子。",
+      "doc": "docs/zh-CN/concepts/profiles.md#精度配置项"
+    },
+    "FP8_DGRAD": {
+      "en": "Input-gradient GEMM in fp8 (keeps an fp8 W^T copy, 2 B per weight) or 16-bit (1 B per weight).",
+      "zh": "输入梯度 GEMM 用 fp8（保留 fp8 的 W^T 副本，每权重 2 字节）或 16 位（1 字节）。",
+      "doc": "docs/zh-CN/concepts/profiles.md#精度配置项"
+    },
+    "MEMORY_OVERRIDES": {
+      "en": "Raw MemoryPlan field overrides layered onto whichever profile mode is active. The escape hatch past the catalog.",
+      "zh": "原始 MemoryPlan 字段覆盖，叠加在当前模式之上。绕开配置档做细调的出口。",
+      "doc": "docs/zh-CN/concepts/profiles.md#内存配置档"
+    },
+    "PARALLEL": {
+      "en": "Multi-GPU layout: none, ddp, fsdp, pipeline or threaded. The launcher starts one process per DEVICES entry.",
+      "zh": "多卡布局：none、ddp、fsdp、pipeline、threaded。启动器为 DEVICES 每项起一个进程。",
+      "doc": "docs/zh-CN/guides/multi-gpu.md#多-gpu-训练"
+    },
+    "DIST_BACKEND": {
+      "en": "Process-group backend: auto (nccl on CUDA, xccl on XPU, else gloo), nccl or gloo. xccl is auto-only.",
+      "zh": "进程组后端：auto（CUDA 用 nccl、XPU 用 xccl、其余 gloo）、nccl 或 gloo。",
+      "doc": "docs/zh-CN/internals/distributed-launch.md#配置项"
+    },
+    "DEVICES": {
+      "en": "Device list driving one launcher process per entry; also gates the bf16 support check for the chosen precision.",
+      "zh": "设备列表，每项起一个进程；同时用于校验所选精度是否支持 bf16。",
+      "doc": "docs/zh-CN/guides/multi-gpu.md#多-gpu-训练"
+    },
+    "PIPELINE_SCHEDULE": {
+      "en": "Pipeline schedule: gpipe, 1f1b, zbv, dualpipe-v and friends; threaded takes gpipe or async only.",
+      "zh": "流水线调度：gpipe、1f1b、zbv 等；threaded 只支持 gpipe 与 async。",
+      "doc": "docs/zh-CN/guides/multi-gpu.md#调度"
+    },
+    "PIPELINE_SPLIT": {
+      "en": "How stages split the layers: measured, flops, even, or an explicit per-stage layer count such as (11, 10, 11, 10).",
+      "zh": "阶段切分层的方式：measured、flops、even，或每阶段层数如 (11,10,11,10)。",
+      "doc": "docs/zh-CN/guides/multi-gpu.md#阶段划分"
+    },
+    "MICROBATCHES": {
+      "en": "Micro-batches per step in pipeline and threaded layouts; most schedules require at least the rank count.",
+      "zh": "流水线与线程化布局下每一步的微批次数；多数调度要求不小于卡数。",
+      "doc": "docs/zh-CN/guides/multi-gpu.md#调度"
+    },
+    "FSDP_REDUCE": {
+      "en": "With FSDP and GRAD_ACC above 1: step does one reduce-scatter per step, micro does it every micro-batch.",
+      "zh": "FSDP 且 GRAD_ACC 大于 1 时：step 每步归约一次，micro 每微批次一次。",
+      "doc": "docs/zh-CN/guides/multi-gpu.md#损失归一化"
+    },
+    "FSDP_RESHARD": {
+      "en": "Block parameters: forward frees them after each block (ZeRO-3); backward holds them unsharded (ZeRO-2).",
+      "zh": "块参数：forward 每块前向后释放（ZeRO-3），backward 保持未分片（ZeRO-2）。",
+      "doc": "scripts/train/moss.py#L171"
+    },
+    "DDP_BACKEND": {
+      "en": "ddp reducers: kohakumoss (project reducers, every memory plan) or torch (stock DDP, the A/B baseline).",
+      "zh": "ddp 归约器：kohakumoss（项目自带，全档可用）或 torch（原生 DDP，当基线）。",
+      "doc": "docs/zh-CN/guides/multi-gpu.md#原生-torch-ddp"
+    },
+    "DDP_REDUCE_DTYPE": {
+      "en": "Reduction dtype for the gradient all-reduce; fp32 sums exactly, other values trade accuracy for bandwidth.",
+      "zh": "梯度 all-reduce 的归约精度；fp32 精确求和，其他值拿精度换带宽。",
+      "doc": "docs/zh-CN/guides/multi-gpu.md#归约-dtype"
+    },
+    "DIST_TIMEOUT": {
+      "en": "Per-operation and store wait time in seconds. Raise it on slow interconnects or large allocations.",
+      "zh": "每次集合通信与存储等待的秒数。互联慢或集群大时调大。",
+      "doc": "docs/zh-CN/internals/distributed-launch.md#配置项"
+    },
+    "DIST_GATE_TIMEOUT": {
+      "en": "Seconds a store gate waits for rank-0-only or per-rank startup work such as catalog scans, tuning or saves.",
+      "zh": "存储门控等待 rank0 专属或各 rank 启动工作的秒数，如扫描、调优、存档。",
+      "doc": "docs/zh-CN/internals/distributed-launch.md#配置项"
+    },
+    "DIST_BIND": {
+      "en": "Process-group device binding: lazy builds communicators on first use, device binds them at init.",
+      "zh": "进程组设备绑定：lazy 首次使用时建通信器，device 初始化即绑定。",
+      "doc": "docs/zh-CN/internals/distributed-launch.md#配置项"
+    },
+    "KERNELS": {
+      "en": "Per-family kernel choices such as KERNELS[\"lycoris\"] = auto or a backend name; overrides the plan's bindings.",
+      "zh": "按家族的算子选择，如 KERNELS[\"lycoris\"] 填 auto 或后端名，覆盖计划绑定。",
+      "doc": "docs/zh-CN/concepts/adapters.md#配置项"
+    },
+    "TUNE": {
+      "en": "table binds stored decisions and tunes the missing ones in the prewarm before step 0; off never times anything.",
+      "zh": "table 绑定已存决策，缺的在第 0 步前预热中调；off 完全不计时。",
+      "doc": "docs/zh-CN/guides/logging.md#内核调优"
+    },
+    "RETUNE_STEPS": {
+      "en": "With TUNE=table, re-compares kernels against compile after each of the first N steps, then stops queueing shapes.",
+      "zh": "TUNE=table 时前 N 步每步后重比内核与 compile，之后不再排队新形状。",
+      "doc": "docs/zh-CN/concepts/training.md#内核预热"
+    },
+    "COMPILE": {
+      "en": "torch.compile scope: off, block (per block) or model (whole model). Big speedups cost extra compile time.",
+      "zh": "torch.compile 的范围：off、block（按块）、model（整模型）。提速换来编译耗时。",
+      "doc": "docs/zh-CN/concepts/profiles.md#内存配置项"
+    },
+    "DRIVER": {
+      "en": "Training loop driver: native or lightning (manual optimisation); both run the same TrainStep to equal parameters.",
+      "zh": "训练循环驱动：native 或 lightning（手动优化）。两者跑同样的 TrainStep，参数一致。",
+      "doc": "docs/zh-CN/concepts/training.md#驱动器"
+    },
+    "STEPS": {
+      "en": "Total optimiser steps in the run; drives the progress bar and the SCHEDULE end: -1 default.",
+      "zh": "本次运行的总优化步数；决定进度条与 SCHEDULE 中 end=-1 的取值。",
+      "doc": "docs/zh-CN/guides/logging.md#进度条"
+    },
+    "GRAD_ACC": {
+      "en": "Gradient accumulation: micro-batches summed into one optimiser step, losses normalised by the global token count.",
+      "zh": "梯度累积：多个微批次合成一步，损失按全局词元数归一化。",
+      "doc": "docs/zh-CN/concepts/training.md#目标函数"
+    },
+    "OUTPUT_DIR": {
+      "en": "Root directory for runs, checkpoints, metrics and traces. Point it at a fast disk with room for saves.",
+      "zh": "运行根目录：检查点、指标、跟踪文件都写这里。指到够大够快的盘上。",
+      "doc": "docs/zh-CN/guides/multi-gpu.md#扩展性运行"
+    },
+    "RUN_NAME": {
+      "en": "Name distinguishing this run's outputs under OUTPUT_DIR; set one per sweep member to avoid overwrites.",
+      "zh": "本次运行在 OUTPUT_DIR 下的名字后缀。扫描多组配置时各设一个以免覆盖。",
+      "doc": "docs/zh-CN/guides/multi-gpu.md#扩展性运行"
+    },
+    "LOGGER": {
+      "en": "Console-side sink besides metrics.jsonl: console or wandb. Enable wandb to track runs across machines.",
+      "zh": "除 metrics.jsonl 外的接收端：console 或 wandb。要跨机追踪时开 wandb。",
+      "doc": "docs/zh-CN/guides/logging.md#设置"
+    },
+    "PROJECT": {
+      "en": "Name reported to the external sink, grouping this run's metrics under one project. Set it per experiment series.",
+      "zh": "上报给外部接收端的项目名，把本次指标归到同一项目下。",
+      "doc": "docs/zh-CN/guides/logging.md"
+    },
+    "LOG_EVERY": {
+      "en": "Console step-line interval when the bar is off, and the default for METRICS_EVERY. First and last steps always print.",
+      "zh": "关掉进度条时控制台日志行的间隔，也是 METRICS_EVERY 的默认值。",
+      "doc": "docs/zh-CN/guides/logging.md#设置"
+    },
+    "METRICS_EVERY": {
+      "en": "How often metric rows reach metrics.jsonl and wandb, and the throughput, VRAM and encoder monitors; 1 per step.",
+      "zh": "指标行写入 metrics.jsonl 与 wandb 的间隔，也驱动吞吐、显存监视器。",
+      "doc": "docs/zh-CN/guides/logging.md#设置"
+    },
+    "PROGRESS": {
+      "en": "tqdm progress bar over STEPS, shown on a TTY or when FORCE_COLOR=1. Turn it off for clean logs.",
+      "zh": "覆盖 STEPS 的 tqdm 进度条，TTY 或 FORCE_COLOR=1 时显示。要干净日志就关。",
+      "doc": "docs/zh-CN/guides/logging.md#设置"
+    },
+    "NONFINITE_PATIENCE": {
+      "en": "Stops after N non-finite steps at the loss-scale floor, or N steps with the same bad parameters; 0 disables.",
+      "zh": "损失缩放触底或同一批参数连续 N 步非有限时停下并转储复现；0 关闭。",
+      "doc": "docs/zh-CN/concepts/training.md#遇到非有限步骤时停止"
+    },
+    "TRACE_STEPS": {
+      "en": "(first, last): runs torch.profiler over steps first+1..last on every rank and writes Chrome traces under ranks/.",
+      "zh": "(first, last)：每个 rank 用 torch.profiler 采样这些步，写 Chrome trace。",
+      "doc": "docs/zh-CN/guides/multi-gpu.md#性能分析"
+    },
+    "PROFILE_STEPS": {
+      "en": "(first, last): wraps cudaProfilerStart/Stop around those steps so ncu or nsys captures exactly that window.",
+      "zh": "(first, last)：在该窗口内启停 cudaProfiler，供 ncu 或 nsys 精确抓取。",
+      "doc": "docs/zh-CN/guides/multi-gpu.md#性能分析"
+    },
+    "SAMPLE_PROMPTS": {
+      "en": "Prompts rendered at each sampling step to preview the adapter. Set the look you want to track during training.",
+      "zh": "每个采样步渲染的提示词，用来预览适配器效果。设成想持续观察的画面。",
+      "doc": "docs/zh-CN/guides/inference.md#与训练脚本共享的设置"
+    },
+    "SAMPLE_NEGATIVE": {
+      "en": "Negative prompt shared by every sample and paired with the guidance scale. Set it to lock a baseline look.",
+      "zh": "所有采样共用的负向提示词，与 CFG 一起生效。想锁定基线画风时设置。",
+      "doc": "docs/zh-CN/guides/inference.md#与训练脚本共享的设置"
+    },
+    "SAMPLE_EVERY": {
+      "en": "Steps between sampling passes; 0 disables in-training sampling. fsdp layouts reject it because sampling is rank 0 only.",
+      "zh": "采样间隔步数，0 关闭训练中采样。fsdp 布局会拒绝，因为采样只在 rank0。",
+      "doc": "docs/zh-CN/guides/multi-gpu.md#支持的内存计划"
+    },
+    "SAMPLE_STEPS": {
+      "en": "Denoising steps per sample; more steps cost training time but reveal the adapter's ceiling better.",
+      "zh": "每张采样的去噪步数。步数越多越能看出上限，但更吃训练时间。",
+      "doc": "docs/zh-CN/guides/inference.md#与训练脚本共享的设置"
+    },
+    "SAMPLE_CFG": {
+      "en": "Classifier-free guidance scale for samples. Keep it at the deployment value so previews match inference.",
+      "zh": "采样的无分类器引导强度。保持与推理一致，预览才对得上交付效果。",
+      "doc": "docs/zh-CN/guides/inference.md#与训练脚本共享的设置"
+    },
+    "SAMPLE_SHIFT": {
+      "en": "Sigma shift for the sampling schedule; keep it equal to the shift you plan to use at inference.",
+      "zh": "采样调度里的 sigma 偏移量。与推理时要用的 shift 保持一致。",
+      "doc": "docs/zh-CN/guides/inference.md#与训练脚本共享的设置"
+    },
+    "SAMPLE_SKIP_LAYERS": {
+      "en": "Block indices the sampling pass skips, trading detail for preview speed and VRAM.",
+      "zh": "采样时跳过的块索引，用细节换预览的速度与显存。",
+      "doc": "docs/zh-CN/guides/inference.md#与训练脚本共享的设置"
+    },
+    "SAMPLE_SIZE": {
+      "en": "Sample resolution; set it to the training area so previews reflect the trained geometry.",
+      "zh": "采样分辨率。设成训练时的面积，预览才能反映真实构图。",
+      "doc": "docs/zh-CN/guides/inference.md#与训练脚本共享的设置"
+    },
+    "SAMPLE_SEEDS": {
+      "en": "Seeds for the sampling passes; keep them fixed so successive previews stay comparable.",
+      "zh": "采样用的种子。固定下来，前后几次预览才可比较。",
+      "doc": "docs/zh-CN/guides/inference.md#与训练脚本共享的设置"
+    },
+    "VALIDATE_EVERY": {
+      "en": "Steps between validation passes over the VALIDATION datasets; 0 disables it. Each pass runs a forward on every rank.",
+      "zh": "在验证集上跑验证的间隔步数，0 关闭。每次验证在所有 rank 上前向一遍。",
+      "doc": "scripts/train/moss.py#L221"
+    },
+    "VALIDATION": {
+      "en": "Validation set and loss settings: datasets, sigma grid and seed. Fill it when you want held-out loss curves.",
+      "zh": "验证集与损失设置：datasets、sigmas、seed。想要留出集曲线时填。",
+      "doc": "scripts/train/moss.py#L222"
+    },
+    "SAVE_EVERY": {
+      "en": "Steps between resume checkpoints; 0 disables periodic saving. Written into .partial first, then renamed.",
+      "zh": "保存可恢复检查点的间隔步数，0 关闭周期保存。先写 .partial 再原子改名。",
+      "doc": "docs/zh-CN/concepts/training.md#检查点"
+    },
+    "SAVE_MINUTES": {
+      "en": "Wall-clock minutes between checkpoints, checked every LOG_EVERY steps. Use it when step duration varies.",
+      "zh": "按墙钟时间保存的间隔分钟数，每 LOG_EVERY 步检查一次。步长不固定时用它。",
+      "doc": "docs/zh-CN/concepts/training.md#检查点"
+    },
+    "KEEP_LAST": {
+      "en": "Checkpoints and their exports kept on disk; older ones are pruned. Raise it for long sweeps.",
+      "zh": "磁盘上保留的检查点与其导出个数，更旧的会被清理。长扫描时调大。",
+      "doc": "docs/zh-CN/guides/export-to-comfy.md#一次运行会写出什么"
+    },
+    "FINAL_CHECKPOINT": {
+      "en": "Whether a resume checkpoint is written at the end: auto (only if periodic saving is on), True or False.",
+      "zh": "结束时是否再写可恢复检查点：auto（仅开启周期保存时）、True 或 False。",
+      "doc": "docs/zh-CN/concepts/training.md#检查点"
+    },
+    "RESUME": {
+      "en": "Checkpoint directory to continue from, or latest for the newest. A resumed run appends to the existing logs.",
+      "zh": "要继续训练的检查点目录，或填 latest 取最新一个。恢复后日志续写同一份。",
+      "doc": "docs/zh-CN/guides/logging.md#新运行与恢复运行"
+    },
+    "SAVE_FORMAT": {
+      "en": "Export layout: comfy, hf, both or none. comfy writes ComfyUI files, hf uses diffusers key names.",
+      "zh": "导出格式：comfy、hf、both、none。comfy 出 ComfyUI 文件，hf 用 diffusers 键。",
+      "doc": "docs/zh-CN/guides/export-to-comfy.md#一次运行会写出什么"
+    },
+    "SAVE_MERGED": {
+      "en": "Adapter runs only: also writes the merged DiT in SAVE_FORMAT so it loads without the adapter.",
+      "zh": "仅适配器运行有效：额外写出合并后的 DiT，不挂适配器也能直接加载。",
+      "doc": "docs/zh-CN/guides/export-to-comfy.md#一次运行会写出什么"
+    },
+    "SAVE_FUSED_QKV": {
+      "en": "Comfy files: stores joint q/k/v as one proj.qkv. auto follows how the trained DiT file stores them.",
+      "zh": "Comfy 文件把联合 q/k/v 存成一个 proj.qkv；auto 跟随底座文件存法。",
+      "doc": "docs/zh-CN/guides/export-to-comfy.md#一次运行会写出什么"
+    },
+    "CHECKPOINT_EXPORT": {
+      "en": "Also writes the export files under every checkpoint's export/ folder; their size is logged at build.",
+      "zh": "在每个检查点的 export/ 里也写一份导出，体积会在构建日志列出。",
+      "doc": "docs/zh-CN/guides/export-to-comfy.md#导出到-comfyui"
+    },
+    "EXPORT_FORMATS": {
+      "en": "Older spelling of the export controls, mapped onto SAVE_FORMAT and SAVE_MERGED with one INFO line at validation.",
+      "zh": "导出控制项的旧写法，校验时映射到 SAVE_FORMAT 与 SAVE_MERGED。",
+      "doc": "docs/zh-CN/guides/export-to-comfy.md#一次运行会写出什么"
+    }
+  }
+}

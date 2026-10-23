@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="teletype" data-mode="light" data-density="relaxed" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KohakuMoss</title>
+<link rel="stylesheet" href="/assets/base.css">
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/themes/teletype.css">
+<link rel="stylesheet" href="/assets/themes/kohaku.css">
+<link rel="stylesheet" href="/assets/themes/soul.css">
+</head>
+<body>
+<div class="app" id="app">
+  <header class="mast">
+    <span class="brand" data-i18n="app.name">KOHAKUMOSS</span>
+    <span class="dim">·</span>
+    <span data-i18n="app.sub">TELEFAX</span>
+    <span class="crumb"><span class="dim">/</span><b id="crumb">WORKBENCH</b></span>
+    <span class="sp"></span>
+    <span class="chip idle" id="chip"><span class="sq"></span><span id="chipText">NO RUN</span></span>
+    <button id="langBtn" type="button" title="Interface language" aria-label="Interface language">[ EN ]</button>
+    <button id="modeBtn" type="button" title="Switch light / carbon" aria-label="Switch light or carbon">[ CARBON ]</button>
+  </header>
+
+  <div class="body">
+    <aside class="aside">
+      <nav class="nav">
+        <div class="grp" data-i18n="nav.group.workbench">WORKBENCH</div>
+        <a href="#/new" data-view="new"><span class="idx">01</span><span class="t" data-i18n="nav.new">NEW RUN</span></a>
+        <a href="#/queue" data-view="queue"><span class="idx">02</span><span class="t" data-i18n="nav.queue">QUEUE</span></a>
+        <a href="#/runs" data-view="runs"><span class="idx">03</span><span class="t" data-i18n="nav.runs">RUNS</span></a>
+        <div class="grp" data-i18n="nav.group.data">DATA</div>
+        <a href="#/datasets" data-view="datasets"><span class="idx">04</span><span class="t" data-i18n="nav.datasets">DATASETS</span></a>
+        <a href="#/artifacts" data-view="artifacts"><span class="idx">05</span><span class="t" data-i18n="nav.artifacts">ARTIFACTS</span></a>
+        <div class="grp" data-i18n="nav.group.studio">STUDIO</div>
+        <a href="#/profile" data-view="profile"><span class="idx">06</span><span class="t" data-i18n="nav.profile">PROFILE</span></a>
+        <a href="#/notebook" data-view="notebook"><span class="idx">07</span><span class="t" data-i18n="nav.notebook">NOTEBOOK</span></a>
+        <div class="grp" data-i18n="nav.group.system">SYSTEM</div>
+        <a href="#/doctor" data-view="doctor"><span class="idx">08</span><span class="t" data-i18n="nav.doctor">DOCTOR</span></a>
+        <a href="#/settings" data-view="settings"><span class="idx">09</span><span class="t" data-i18n="nav.settings">SETTINGS</span></a>
+      </nav>
+      <div class="runner" id="runner">
+        <div class="row"><span class="live">IDLE</span><span>--</span></div>
+        <div class="row"><span>no run</span></div>
+        <div>start one from NEW RUN</div>
+        <div class="bar">[..........]</div>
+      </div>
+    </aside>
+
+    <main id="main">
+      <div class="loading surface">LOADING…</div>
+    </main>
+  </div>
+
+  <footer class="foot">
+    <span><span data-i18n="foot.gpu">GPU</span> <b id="f-gpu">--</b></span>
+    <span><span data-i18n="foot.torch">TORCH</span> <b id="f-torch">--</b></span>
+    <span><span data-i18n="foot.kogine">KOGINE</span> <b id="f-kogine">--</b></span>
+    <span><span data-i18n="foot.knobs">KNOBS</span> <b id="f-knobs">--</b></span>
+    <span class="sp"></span>
+    <span id="f-time">--:--:--</span>
+    <span><span data-i18n="foot.theme">THEME</span> <b id="f-theme">TELETYPE / LIGHT</b></span>
+  </footer>
+</div>
+
+<div id="toast"></div>
+<script type="module" src="/assets/app.js"></script>
+</body>
+</html>

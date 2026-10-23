@@ -1,0 +1,320 @@
+/* Kohaku: warm gray matte workbench, five gem accents, borders over shadows.
+   Every value is quoted from the kohaku-gem-design token sheet
+   (references/design-tokens.md): (warm-N) is a rung of the eleven-step warm ramp,
+   the only grey this language allows, and (gem-shade) is one of the three shades a
+   gem has -- light / DEFAULT / shadow. No hand-tuned hex, no fourth shade. */
+
+/* Gem triples, declared once: the hexes never change between modes, only the role
+   they play. Light paints a light fill under shadow ink, carbon inverts it to a
+   shadow fill under light ink (design-tokens.md 1.D). */
+html[data-theme="kohaku"]{
+  --heat-0:var(--panel-alt);
+  --heat-1:var(--gem-aquamarine-light);
+  --heat-2:color-mix(in srgb,var(--gem-aquamarine-light) 50%,var(--gem-aquamarine));
+  --heat-3:var(--gem-aquamarine);
+  --heat-4:var(--gem-aquamarine-shadow);
+  --radius-sm:6px;
+  --radius-md:8px;
+  --radius-lg:8px;
+  --radius-status:6px;
+  --font-ui:"Noto Sans","Noto Sans CJK SC",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,monospace;
+  --warn:var(--status-warn);
+  --tint:color-mix(in srgb,var(--text-primary) 6%,transparent);
+  --tint2:color-mix(in srgb,var(--text-primary) 10%,transparent);
+  --gem-iolite-light:#DDD0F0;
+  --gem-iolite:#5A4FCF;
+  --gem-iolite-shadow:#312A7A;
+  --gem-sapphire-light:#D6E3F8;
+  --gem-sapphire:#0F52BA;
+  --gem-sapphire-shadow:#082567;
+  --gem-aquamarine-light:#D4EDE8;
+  --gem-aquamarine:#4C9989;
+  --gem-aquamarine-shadow:#1B6B5A;
+  --gem-amber-light:#F5E6C8;
+  --gem-amber:#D4920A;
+  --gem-amber-shadow:#8B5E00;
+  --gem-coral-light:#F5D5D5;
+  --gem-coral:#D46B6B;
+  --gem-coral-shadow:#8B3A3A;
+}
+
+/* Light: warm paper (warm-50) under white cards, the rail is the one deeper stone
+   slab (warm-100), and the borders carry the hierarchy -- the page shadow is a
+   single hairline, see the .box rule at the bottom. Text keeps the light-mode
+   contrast override from design-tokens.md 2 (warm-400/500 are too pale on paper,
+   so muted takes the #77706A value the sheet provides for exactly this). */
+html[data-theme="kohaku"][data-mode="light"]{
+  --canvas:#F7F5F2;
+  --panel:#FFFFFF;
+  --panel-alt:#EFECE7;
+  --elevated:#FFFFFF;
+  --overlay:#FFFFFF;
+  --border-subtle:color-mix(in srgb,#E0DBD4 60%,#F7F5F2);
+  --border-default:#E0DBD4;
+  --border-strong:#C5BFB7;
+  --text-primary:#4A4540;
+  --text-secondary:#6A645F;
+  --text-muted:#77706A;
+  --text-disabled:#A09A92;
+  --text-inverse:#FFFFFF;
+  --accent:var(--gem-iolite);
+  --accent-weak:color-mix(in srgb,var(--gem-iolite) 10%,transparent);
+  --accent-strong:var(--gem-iolite-shadow);
+  --accent-on:#FFFFFF;
+  --status-run:var(--gem-aquamarine-shadow);
+  --status-ok:var(--gem-aquamarine-shadow);
+  --status-warn:var(--gem-amber-shadow);
+  --status-error:var(--gem-coral-shadow);
+  --status-idle:#8A8480;
+  --info:var(--gem-sapphire);
+  --radius:6px;
+
+  /* Gem cast per slot: light fill, shadow ink, DEFAULT frame. Idle is the warm
+     stamp -- a stone slab with warm-600 ink, no gem. */
+  --gem-active-fill:var(--gem-iolite-light);
+  --gem-active-ink:var(--gem-iolite-shadow);
+  --gem-active-rule:var(--gem-iolite);
+  --gem-ok-fill:var(--gem-aquamarine-light);
+  --gem-ok-ink:var(--gem-aquamarine-shadow);
+  --gem-ok-rule:var(--gem-aquamarine);
+  --gem-warn-fill:var(--gem-amber-light);
+  --gem-warn-ink:var(--gem-amber-shadow);
+  --gem-warn-rule:var(--gem-amber);
+  --gem-error-fill:var(--gem-coral-light);
+  --gem-error-ink:var(--gem-coral-shadow);
+  --gem-error-rule:var(--gem-coral);
+  --gem-idle-fill:#EFECE7;
+  --gem-idle-ink:#4A4540;
+  --gem-idle-rule:#C5BFB7;
+}
+
+/* Carbon: the five-level ladder only ever brightens inward from the page -- the
+   page is warm-950, the rail is one half step up (the V2 dark canvas #221F1D, the
+   same "one step above the page" the derived panel-alt lands on), the panel is
+   warm-900, and the raised pair is warm-800. Shadows are none in dark: the frames
+   below carry the hierarchy, so border-default takes warm-700 and idle stamps use
+   warm-400 ink instead of warm-600. Accents are inverted: iolite light is the
+   accent ink, the shadow shade is the fill. */
+html[data-theme="kohaku"][data-mode="carbon"]{
+  --heat-1:var(--gem-aquamarine-shadow);
+  --heat-2:color-mix(in srgb,var(--gem-aquamarine-shadow) 50%,var(--gem-aquamarine));
+  --heat-4:var(--gem-aquamarine-light);
+  --canvas:#1A1816;
+  --panel:#2A2724;
+  --panel-alt:#221F1D;
+  --elevated:#3A3632;
+  --overlay:#3A3632;
+  --border-subtle:color-mix(in srgb,#3A3632 60%,#2A2724);
+  --border-default:#4A4540;
+  --border-strong:#6A645F;
+  --text-primary:#E8E0D8;
+  --text-secondary:#C5BFB7;
+  --text-muted:#A09A92;
+  --text-disabled:#8A8480;
+  --text-inverse:#1A1816;
+  --accent:var(--gem-iolite-light);
+  --accent-weak:color-mix(in srgb,var(--gem-iolite-shadow) 30%,transparent);
+  --accent-strong:var(--gem-iolite);
+  --accent-on:#1A1816;
+  --status-run:var(--gem-aquamarine-light);
+  --status-ok:var(--gem-aquamarine-light);
+  --status-warn:var(--gem-amber-light);
+  --status-error:var(--gem-coral-light);
+  --status-idle:#A09A92;
+  --info:var(--gem-sapphire-light);
+  --radius:6px;
+
+  /* Same slots, inverted: shadow fill at 30 %, light ink, shadow frame. */
+  --gem-active-fill:color-mix(in srgb,var(--gem-iolite-shadow) 30%,transparent);
+  --gem-active-ink:var(--gem-iolite-light);
+  --gem-active-rule:var(--gem-iolite-shadow);
+  --gem-ok-fill:color-mix(in srgb,var(--gem-aquamarine-shadow) 30%,transparent);
+  --gem-ok-ink:var(--gem-aquamarine-light);
+  --gem-ok-rule:var(--gem-aquamarine-shadow);
+  --gem-warn-fill:color-mix(in srgb,var(--gem-amber-shadow) 30%,transparent);
+  --gem-warn-ink:var(--gem-amber-light);
+  --gem-warn-rule:var(--gem-amber-shadow);
+  --gem-error-fill:color-mix(in srgb,var(--gem-coral-shadow) 30%,transparent);
+  --gem-error-ink:var(--gem-coral-light);
+  --gem-error-rule:var(--gem-coral-shadow);
+  --gem-idle-fill:color-mix(in srgb,var(--elevated) 60%,transparent);
+  --gem-idle-ink:var(--text-muted);
+  --gem-idle-rule:var(--border-default);
+}
+
+/* Status chapter. Aquamarine carries running and successful work, amber carries
+   waiting, coral carries failures. Iolite is reserved for actions and selection;
+   the mast indicator and the row stamp consume the same status slot. */
+html[data-theme="kohaku"] .st:is(.run,.runn,[data-status="running"],[data-status="starting"]){
+  background:var(--gem-ok-fill);color:var(--gem-ok-ink);border-color:var(--gem-ok-rule)}
+html[data-theme="kohaku"] .st:is(.done,[data-status="done"],[data-status="trained"]){
+  background:var(--gem-ok-fill);color:var(--gem-ok-ink);border-color:var(--gem-ok-rule)}
+html[data-theme="kohaku"] .st:is([data-status="queued"],[data-status="waiting"],[data-status="paused"],[data-status="idea"],[data-status="todo"]){
+  background:var(--gem-warn-fill);color:var(--gem-warn-ink);border-color:var(--gem-warn-rule)}
+html[data-theme="kohaku"] .st:is([data-status="failed"]){
+  background:var(--gem-error-fill);color:var(--gem-error-ink);border-color:var(--gem-error-rule)}
+html[data-theme="kohaku"] .st:is(.stop,.unkn,.unknown,[data-status="idle"],[data-status="canceled"],[data-status="dropped"],[data-status="unknown"]){
+  background:var(--gem-idle-fill);color:var(--gem-idle-ink);border-color:var(--gem-idle-rule)}
+/* Pinned uses the iolite action slot without a fill. */
+html[data-theme="kohaku"] .st[data-status="pinned"]{
+  background:none;color:var(--gem-active-ink);border-color:var(--gem-active-rule)}
+
+/* Active tab: a 2px iolite underline and no slab (component-recipes.md 8). The
+   indicator is an inset shadow so `.tabs button.on { margin-bottom: -1px }` and the
+   strip rule keep their geometry; the frame goes transparent so only the line
+   survives. */
+html[data-theme="kohaku"] .tabs button.on{
+  background:none;border-color:transparent;box-shadow:inset 0 -2px 0 var(--accent)}
+
+/* Active cell of a control group: the primary gem wash, never a filled ink slab
+   (component-recipes.md 3b). --gem-active-* already holds the right halves in both
+   modes, so these two rules need no mode split. */
+html[data-theme="kohaku"] .seg button.on{
+  background:var(--gem-active-fill);color:var(--gem-active-ink)}
+html[data-theme="kohaku"] .knoblevels .btn.on{
+  background:var(--gem-active-fill);border-color:var(--gem-active-rule);color:var(--gem-active-ink)}
+
+/* Mast chip: the warm chip variant -- a stone slab with a quiet frame. The square
+   dot inside already carries the run colour, so the chip itself stays grey. */
+html[data-theme="kohaku"] .chip{
+  background:var(--panel-alt);color:var(--text-secondary);border-color:var(--border-default)}
+html[data-theme="kohaku"][data-mode="carbon"] .chip{
+  background:var(--panel);color:var(--text-secondary)}
+
+/* Settings theme card: the selected one is framed in iolite. app.css owns the 2px
+   frame and its compensating padding, so only the colour moves. */
+html[data-theme="kohaku"] .theme.on{border-color:var(--accent)}
+
+/* Hovers: a hue wash instead of a filled slab, the gesture the skill names for
+   button groups (component-recipes.md 3b). Primary and danger keep their own
+   recipes, and the active cells keep the gem wash above. Rows and rails take a
+   stone wash; --tint is only set when the five pickers are active, so it cannot
+   be relied on here. */
+html[data-theme="kohaku"][data-mode="light"] .btn:not(.pri):not(.dngr):not(.on):hover{
+  background:var(--accent-weak);border-color:var(--accent);color:var(--text-primary)}
+html[data-theme="kohaku"] .nav a:not(.on):hover{
+  background:color-mix(in srgb,var(--border-strong) 30%,transparent);color:var(--text-primary)}
+html[data-theme="kohaku"] .led tbody tr:hover td{
+  background:color-mix(in srgb,var(--border-strong) 26%,transparent)}
+
+/* Buttons and links keep a visible keyboard ring. Native fields use the inset
+   border-only focus recipe below, independently of the generic knob outline. */
+html[data-theme="kohaku"] :is(.btn,.chip,button,a[href]):focus-visible{
+  outline:2px solid var(--accent);outline-offset:3px}
+
+/* Scrollbar: 6px, stone thumb, no track (the sheet's own scrollbar recipe). */
+html[data-theme="kohaku"] ::-webkit-scrollbar{width:6px;height:6px}
+html[data-theme="kohaku"] ::-webkit-scrollbar-track{background:transparent}
+html[data-theme="kohaku"] ::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:3px}
+html[data-theme="kohaku"] ::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
+
+/* Dot grid: the sheet's 1px warm-400 dots at 35 % on paper (component-recipes.md
+   11), dimmed to 22 % in carbon so they read as specks rather than a grid. Only
+   painted while no wallpaper is set -- app.css makes the shell transparent then,
+   and the desk belongs to the user's image. */
+html[data-theme="kohaku"][data-bg="off"] .app{
+  background-image:radial-gradient(color-mix(in srgb,#A09A92 35%,transparent) 1px,transparent 1px);
+  background-size:14px 14px}
+html[data-theme="kohaku"][data-mode="carbon"][data-bg="off"] .app{
+  background-image:radial-gradient(color-mix(in srgb,#A09A92 22%,transparent) 1px,transparent 1px)}
+
+/* Card lift: one hairline of shadow in light (the sheet's only light shadow);
+   carbon has none, its frames do the work. */
+html[data-theme="kohaku"][data-mode="light"] .box{box-shadow:0 1px 2px rgb(40 34 28 / .05)}
+
+html[data-theme="kohaku"] :is(.btn,.seg){border-radius:var(--radius-sm)}
+html[data-theme="kohaku"] :is(.box,.theme){border-radius:var(--radius-md)}
+html[data-theme="kohaku"] .chip{border-radius:var(--radius-status)}
+
+/* Primary action carries the gem, not the ink: app.css fills .btn.pri with the
+   text colour, which in carbon becomes a bright plate that outshouts every
+   status stamp. iolite (or iolite-light in carbon) keeps the emphasis hierarchy
+   in one hue family. */
+html[data-theme="kohaku"] .btn.pri{
+  background:var(--accent);border-color:var(--accent-strong);color:var(--accent-on)}
+html[data-theme="kohaku"] .btn.pri:hover{
+  background:var(--accent-strong);border-color:var(--accent-strong);color:var(--accent-on)}
+
+/* Complete control family. Shared layout, scale and density stay in app.css.
+   Only IDs, paths, numeric columns and logs use the bundled mono face. */
+html[data-theme="kohaku"][data-mode][data-lang] .app *{letter-spacing:0}
+html[data-theme="kohaku"] :is(pre,code,.code,.logbox,.rawname,.knob-state,.st,.foot,.mast .chip,.runner .bar,.cfg-link,.cfg-base,.led td.num,.ledger td.v,.knobcontrol .field,.newrun-head .field){font-family:var(--font-mono)}
+
+html[data-theme="kohaku"] .btn,
+html[data-theme="kohaku"] .mast button,
+html[data-theme="kohaku"] .mast a.mini,
+html[data-theme="kohaku"] .knob-help-btn{
+  appearance:none;border-color:var(--border-default);border-style:solid;
+  border-radius:var(--radius-sm);background:var(--panel-alt);color:var(--text-secondary);
+  font-weight:500;text-transform:none;box-shadow:none;
+}
+html[data-theme="kohaku"] :is(.btn,.mast button,.mast a.mini,.knob-help-btn):not(.pri):not(.dngr):not(.on):not(:disabled):hover{
+  background:var(--border-default);border-color:var(--border-strong);color:var(--text-primary);
+}
+html[data-theme="kohaku"] .btn.pri{background:var(--accent);border-color:var(--accent-strong);color:var(--accent-on)}
+html[data-theme="kohaku"] .btn.pri:hover{background:var(--accent-strong);color:var(--accent-on)}
+html[data-theme="kohaku"][data-mode="carbon"] .btn.pri:hover{background:var(--accent);color:var(--accent-on);filter:brightness(.96)}
+html[data-theme="kohaku"] .btn.dngr{background:none;color:var(--status-error);border-color:var(--border-default)}
+html[data-theme="kohaku"] .btn.dngr:hover{background:var(--gem-error-fill);color:var(--gem-error-ink);border-color:var(--gem-error-rule)}
+html[data-theme="kohaku"] .btn.on:not(.pri):not(.dngr):not(:disabled){
+  background:var(--gem-active-fill);border-color:var(--gem-active-rule);color:var(--gem-active-ink);
+}
+
+html[data-theme="kohaku"] .seg{background:var(--canvas);border-color:var(--border-default);border-radius:var(--radius-sm);overflow:hidden}
+html[data-theme="kohaku"] .seg button{background:none;color:var(--text-secondary);border-right-color:var(--border-default);text-transform:none;font-weight:500}
+html[data-theme="kohaku"] .seg button.on{background:var(--gem-active-fill);color:var(--gem-active-ink)}
+html[data-theme="kohaku"] .seg button:not(.on):not(:disabled):hover{background:var(--panel-alt);color:var(--text-primary)}
+html[data-theme="kohaku"] .seg button:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--accent)}
+
+/* Inset outlines keep the existing field border-box and row pitch unchanged. */
+html[data-theme="kohaku"] :is(input.field,select.field,textarea.field){
+  appearance:none;background:var(--canvas);background-image:none;border-color:transparent;
+  border-radius:var(--radius-sm);box-shadow:inset 0 0 0 1px var(--border-default);font-weight:400;
+}
+html[data-theme="kohaku"] select.field{appearance:base-select}
+html[data-theme="kohaku"] :is(input.field,select.field,textarea.field):hover{box-shadow:inset 0 0 0 1px var(--border-strong)}
+html[data-theme="kohaku"] .app :is(input.field,select.field,textarea.field):is(:focus,:focus-visible){
+  outline:none;border-color:transparent;box-shadow:inset 0 0 0 1px var(--accent);
+}
+html[data-theme="kohaku"] .field::placeholder{color:var(--text-muted);opacity:1}
+html[data-theme="kohaku"] select.field::picker(select){background:var(--overlay);border-color:var(--border-default);border-radius:var(--radius-sm);box-shadow:none}
+html[data-theme="kohaku"] select.field option{background:var(--overlay);color:var(--text-primary);border-radius:0}
+html[data-theme="kohaku"] select.field option:is(:hover,:focus){background:var(--panel-alt);color:var(--text-primary)}
+html[data-theme="kohaku"] select.field option:checked{background:var(--gem-active-fill);color:var(--gem-active-ink)}
+html[data-theme="kohaku"] select.field option::checkmark{color:inherit}
+
+html[data-theme="kohaku"] .theme{background:var(--panel-alt);border-radius:var(--radius-md);box-shadow:none}
+html[data-theme="kohaku"] .theme.on{background:var(--canvas);border-color:var(--accent)}
+html[data-theme="kohaku"] .csw input[type="color"]{appearance:none;background:var(--canvas);border-color:var(--border-default);border-radius:var(--radius-sm);box-shadow:none}
+html[data-theme="kohaku"] .csw input::-webkit-color-swatch-wrapper{padding:3px}
+html[data-theme="kohaku"] .csw input::-webkit-color-swatch{border:1px solid var(--text-muted);border-radius:3px}
+html[data-theme="kohaku"] .csw input::-moz-color-swatch{border:1px solid var(--text-muted);border-radius:3px}
+html[data-theme="kohaku"] .led td{border-bottom-style:solid;border-bottom-color:var(--border-subtle)}
+html[data-theme="kohaku"] .led th{border-bottom-color:var(--border-default);font-weight:500}
+html[data-theme="kohaku"] .led .red{color:var(--status-error)}
+html[data-theme="kohaku"] .nav a.on{background:var(--panel-alt);border-left-color:var(--accent);color:var(--text-primary)}
+html[data-theme="kohaku"] .nav a.on .idx{color:var(--text-muted);opacity:1}
+html[data-theme="kohaku"] :is(.box,.alert,.code,.shot,details.adv){border-radius:var(--radius-md)}
+html[data-theme="kohaku"] .shot{overflow:hidden}
+html[data-theme="kohaku"] .st{border-radius:var(--radius-status);font-weight:500}
+html[data-theme="kohaku"] :is(.nav .grp,.kgsubhead,.knobpage-head){border-bottom-style:solid;border-bottom-color:var(--border-subtle)}
+html[data-theme="kohaku"] .axisline{border-top-style:solid;border-top-color:var(--border-subtle)}
+html[data-theme="kohaku"] .ledger td.dots{border-bottom-color:transparent}
+html[data-theme="kohaku"] .tabs button:focus-visible,
+html[data-theme="kohaku"] .knobswork .knobtabs button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+html[data-theme="kohaku"] .knobswork .knobtabs button:focus-visible::before{content:none}
+
+/* Disabled state wins over primary, selected, hover and focus recipes. */
+html[data-theme="kohaku"] :is(.btn,.mast button,.seg button,.knob-help-btn):is(:disabled,:disabled:hover){
+  background:var(--panel-alt);border-color:var(--border-default);color:var(--text-disabled);
+  opacity:1;filter:none;box-shadow:none;cursor:not-allowed;
+}
+html[data-theme="kohaku"] .app :is(input.field,select.field,textarea.field):disabled{
+  background:var(--panel-alt);color:var(--text-disabled);box-shadow:inset 0 0 0 1px var(--border-default);cursor:not-allowed;
+}
+/* In glass mode the enclosing surface owns the single material alpha. */
+html[data-theme="kohaku"][data-glass="on"] .app :is(input.field,select.field,textarea.field){background-color:transparent}
+@media (pointer:coarse){
+  html[data-theme="kohaku"] :is(input.field,select.field,textarea.field){font-size:max(16px,var(--fs-body))}
+}

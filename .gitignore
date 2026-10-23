@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.state/
+.pytest_cache/
+.DS_Store
+
+# Local agent state, reports, and caches
+.snow/
+.codegraph/
+.commandcode/
+.cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local secrets (keep sanitized examples available)
+.env
+.env.*
+!.env.example
+!.env.sample
