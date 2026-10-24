@@ -1,6 +1,7 @@
 """Run the trainer's doctor and reduce it to a preflight verdict."""
 
 import json
+import os
 import subprocess
 import tempfile
 import threading
@@ -27,6 +28,9 @@ def _doctor_payload(root: TrainerRoot) -> dict:
             cwd=root.root,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
             timeout=240,
         )
         if target.is_file() and target.stat().st_size > 0:

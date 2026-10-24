@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en" data-theme="kohaku" data-mode="light">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Offline translation linkage fixture</title>
+<link rel="stylesheet" href="../src/kohakumoss_ui/web/base.css">
+<link rel="stylesheet" href="../src/kohakumoss_ui/web/app.css">
+<link rel="stylesheet" href="../src/kohakumoss_ui/web/themes/kohaku.css">
+<body>
+<p>Synthetic fixture only. Serve the repository root with an already-authorized static fixture server; no API or provider is contacted. Focus one segment, hover another, then move outside. Inspect raw selection without changing focused element.</p>
+<label>Fixture <select id="fixture"><option value="tags">Duplicate tags</option><option value="nl">Paragraph-v1 CRLF</option><option value="jsonl">Shared JSONL / arrays</option></select></label>
+<label>Field <select id="field"></select></label>
+<label><input id="dirty" type="checkbox">Unsaved source</label>
+<label><input id="raw" type="checkbox">Raw context</label>
+<label>Status <select id="status"><option>translated</option><option>missing</option><option>failed</option><option>source_changed</option><option>dictionary_changed</option></select></label>
+<section id="translation-fixture" class="grabber"></section>
+<script type="module">
+import {createTranslation} from "../src/kohakumoss_ui/web/grabber-translation.js";
+import {documentFixture,structuredFixture,settings,dictionary,viewFixture,clone} from "./translation_fixture.mjs";
+const words=await fetch("../src/kohakumoss_ui/web/lang/en.json").then(r=>r.json());
+const root=document.querySelector("#translation-fixture"), picker=document.querySelector("#field");
+let doc=documentFixture(), controller;
+const esc=v=>String(v??"").replaceAll("&","&amp;").replaceAll('"',"&quot;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+const gt=k=>words[`grabber.${k}`]||k;
+const api=async(method,route)=>{
+  if(method!=="GET")throw Error("Fixture never executes mutations");
+  if(!["settings","dictionary","view"].includes(route))throw Error("No fixture route");
+  return {ok:true,data:clone(route === "settings" ? settings : route === "dictionary" ? dictionary : viewFixture(doc))};
+};
+function render(){
+  const f=doc.fields[Number(picker.value)||0],raw=document.querySelector("#raw").checked;
+  controller.setWindow({key:`${doc.documentId}:${f.recordId}:${f.pointer}:${raw}`,segments:f.segments});
+  const source=f.segments.map(s=>`<p tabindex="0" data-side="source" data-segment-id="${s.segmentId}">${esc(s.text)}</p>`).join("");
+  root.innerHTML=`<div class="annotation-columns"><div>${source}<textarea class="field" data-field="${raw?"rawText":"source"}" data-record-id="${f.recordId}" data-pointer="${f.pointer}" readonly>${esc(raw?doc.rawText:typeof f.value === "string"?f.value:JSON.stringify(f.value))}</textarea></div>${controller.pane()}</div>`;
+}
+async function selectFixture(){
+  controller?.dispose();
+  const kind=document.querySelector("#fixture").value;doc=kind === "jsonl"?structuredFixture():documentFixture(kind === "nl"?2:1,kind);
+  controller=createTranslation({root,api,esc,gt,alive:()=>true,document:()=>doc,onChange:()=>{}});
+  picker.innerHTML=doc.fields.map((f,i)=>`<option value="${i}">${f.recordId} ${f.pointer||"/"}</option>`).join("");
+  document.querySelector("#dirty").checked=false;await controller.load();render();
+}
+root.addEventListener("input",e=>controller.capture(e.target));
+document.querySelector("#fixture").addEventListener("change",selectFixture);
+picker.addEventListener("change",render);document.querySelector("#raw").addEventListener("change",render);
+document.querySelector("#dirty").addEventListener("change",e=>{controller.state.sourceDirty=e.target.checked;controller.clearHighlight();render();});
+document.querySelector("#status").addEventListener("change",e=>{for(const s of controller.state.view.segments){s.status=e.target.value.endsWith("changed")?"stale":e.target.value;s.staleReason=e.target.value.endsWith("changed")?e.target.value:null;}controller.clearHighlight();render();});
+window.addEventListener("pagehide",()=>controller.dispose());
+await selectFixture();
+</script>
+</body></html>

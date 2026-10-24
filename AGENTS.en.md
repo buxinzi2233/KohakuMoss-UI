@@ -9,7 +9,7 @@ This repository is the standalone local workbench for the KohakuMoss trainer. Us
 - Integrate with `../KohakuMossTrainer` through the **CLI + file contract**: do not import the trainer, do not modify trainer source, do not write its run artifacts.
 - `src/kohakumoss_ui/contract/` is the only layer that knows the trainer's names (`kogine`, `metrics.jsonl`, knob names, run directory layout, doctor JSON). Upstream drift is fixed only here + in tests; do not leak trainer concepts into `server/` or `web/`.
 - By default listen only on `127.0.0.1` with a one-time token; the service can start and stop training processes, so do not bind it to the public internet.
-- The current directory is not a Git repository; even if one is initialized later, do not add/commit/push on your own.
+- The current directory is an independent Git repository; do not add/commit/push on your own.
 
 ## Layout
 
@@ -27,6 +27,7 @@ src/kohakumoss_ui/
     index.html base.css app.css
     api.js format.js app.js views.js settings.js appearance.js
     studio.js heatmap.js profile / notebook / queue (events delegate through data-act)
+    grabber.js           single-source collection / current task results, exported by studio.js; router calls __studioCleanup for polling and listeners
     i18n.js lang/{en,zh}.json
     data/knob-docs.json  en/zh explanation + trainer doc anchor for all 144 knobs
     themes/{kohaku,soul,teletype}.css
@@ -44,7 +45,7 @@ Frontend conventions:
 - Layers are fixed: CUSTOM BACKGROUND does exactly one thing — whether there is a wallpaper (`data-bg="on"` makes `.app` transparent, so the wallpaper shows only through the gaps between controls and through the page margins; off paints the whole page with the theme canvas). **GLASS is the only switch that thins a surface**: with glass off, `.aside` / `.mast` / `.foot` / `.box` / `.runner` are all solid `background:var(--panel)`; only with glass on do they use `color-mix(in srgb, var(--panel) calc(100% * var(--surface-alpha)), transparent)`, and only `.aside` / `.mast` / `.foot` carry `backdrop-filter`. `.app` never reads `--surface-alpha`, and no switch may change geometry (no desk-mat padding or `calc()` height). The old "background on + glass off = 82%/92% translucent" claim was wrong and has been removed: glass off is solid.
 - Teletype's controls use thin paper (surface opacity) instead of frosting but ban `backdrop-filter`: the punch band stays solid, control opacity tracks the slider 1:1 (no floor — legibility comes from the veil and MASK), and the wallpaper only shows between the controls. `docs/teletype.md` (§2, §6, §9) is required reading before changing its appearance.
 - `main`'s top padding and `.vhead-sticky`'s `padding-top` are a **1:1 pair** (relaxed 16px / compact 10px): change `main`'s padding and you must change that with it, or the sticky table header jumps while scrolling.
-- The sidebar order is pinned in the nav of `web/index.html`, so do not reshuffle it casually: workbench = 01 New Run `#/new`, 02 Queue `#/queue`, 03 Runs `#/runs`; data = 04 Datasets `#/datasets`, 05 Artifacts `#/artifacts`; studio = 06 Profile `#/profile`, 07 Notebook `#/notebook`; system = 08 Doctor `#/doctor`, 09 Settings `#/settings`. Artifacts no longer have a group of their own (`nav.group.artifacts` was deleted from both en and zh) — they sit under data.
+- The sidebar order is pinned in the nav of `web/index.html`, so do not reshuffle it casually: workbench = 01 New Run `#/new`, 02 Queue `#/queue`, 03 Runs `#/runs`; data = 04 Image Collection `#/grabber`, 05 Datasets `#/datasets`, 06 Artifacts `#/artifacts`; studio = 07 Profile `#/profile`, 08 Notebook `#/notebook`; system = 09 Doctor `#/doctor`, 10 Settings `#/settings`. Artifacts no longer have a group of their own (`nav.group.artifacts` was deleted from both en and zh) — they sit under data.
 - Call it "training", never the old alchemy wording: `nav.queue` / `nav.profile` / `nav.notebook` read as training queue / training profile / training notebook.
 - Panel-style controls edit in place: clicking the field itself enters edit mode, so do not park a RENAME / UPLOAD text button next to it (`#/profile`'s display name and portrait are click-to-rename / click-to-upload now).
 - Numeric columns pair `.led th.num{text-align:right}` with `.led td.num` on the same side; the one exception is the Datasets page's Image and Caption columns, which stay left-aligned by user request and carry no `num` class.

@@ -26,6 +26,8 @@ const state = {
 
 let pollTimer = null;
 let routeSeq = 0;
+let acceptedHash = location.hash;
+let navigationPending = false;
 
 const main = document.getElementById("main");
 const crumb = document.getElementById("crumb");
@@ -48,8 +50,7 @@ function query() {
 }
 
 function navigate(hash) {
-  if (location.hash === hash) route();
-  else location.hash = hash;
+  return route({ hash });
 }
 
 function toast(message, ok = false) {
@@ -105,6 +106,7 @@ function crumbFor(path) {
     case "queue": return `${part("nav.group.studio")} / ${part("nav.queue")}`;
     case "profile": return `${part("nav.group.studio")} / ${part("nav.profile")}`;
     case "notebook": return `${part("nav.group.studio")} / ${part("nav.notebook")}`;
+    case "grabber": return `${part("nav.group.data")} / ${part("nav.grabber")}`;
     case "datasets": return part("nav.group.data");
     case "artifacts": return part("nav.group.data");
     case "doctor": return `${part("nav.group.system")} / ${part("nav.doctor")}`;
@@ -149,18 +151,52 @@ function stopPoll() {
   }
 }
 
-async function setLanguage(value) {
-  appearance.patch({ lang: value }, true);
-  await i18n.setLang(value);
-  applyShell();
-  route();
+function setLanguage(value) {
+  return route({ language: value });
 }
 
 function unavailableView(label) {
   main.innerHTML = `<div class="empty surface"><b>${escapeHtml(label)}</b><div>${escapeHtml(t("common.loading"))}</div></div>`;
 }
 
-async function route() {
+// Every destructive re-render (including same-hash and language changes) goes
+// through the mounted view's gate. Keep the current URL and language until it
+// resolves; a second request must not replace the first intent or its resolver.
+async function route({ hash = location.hash, language } = {}) {
+  const hashChanged = location.hash !== acceptedHash;
+  const url = (value) => location.pathname + location.search + value;
+  if (hashChanged) history.replaceState(null, "", url(acceptedHash));
+  if (navigationPending) return false;
+  navigationPending = true;
+  const guard = main.__studioBeforeNavigate;
+  const wasInert = main.inert;
+  try {
+    if (guard && !await guard({ kind: "route", value: hash })) return false;
+    if (guard !== main.__studioBeforeNavigate) return false;
+    if (language !== undefined) {
+      // Dictionary loading is asynchronous: do not allow a new draft between
+      // approval and the language re-render.
+      main.inert = true;
+      await i18n.setLang(language);
+      appearance.patch({ lang: language }, true);
+    }
+    if (hash !== acceptedHash) {
+      if (hashChanged) history.replaceState(null, "", url(hash));
+      else history.pushState(null, "", url(hash));
+    }
+    acceptedHash = hash;
+    if (language !== undefined) applyShell();
+    // Release the gate lock once rendering starts, not after network reads in
+    // the new view finish. renderRoute owns the existing routeSeq lifecycle.
+    return renderRoute().then(() => true);
+  } finally {
+    main.inert = wasInert;
+    navigationPending = false;
+  }
+}
+
+async function renderRoute() {
+  main.__studioCleanup?.();
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   const seq = ++routeSeq;
   const { path } = hashParts();
@@ -193,6 +229,9 @@ async function route() {
       await views.newView(main, ctx, decodeURIComponent(parts[1]));
     } else if (parts[0] === "new") {
       await views.newView(main, ctx, "");
+    } else if (parts[0] === "grabber") {
+      if (studio?.grabberView) await studio.grabberView(main, ctx);
+      else unavailableView(t("nav.grabber"));
     } else if (parts[0] === "queue") {
       if (studio?.queueView) await studio.queueView(main, ctx);
       else unavailableView(t("nav.queue"));
@@ -312,12 +351,14 @@ modeBtn.addEventListener("click", () => {
 
 langBtn.addEventListener("click", async () => {
   const next = i18n.lang() === "zh" ? "en" : "zh";
-  await setLanguage(next);
-  toast(t("toast.lang"), true);
+  if (await setLanguage(next)) toast(t("toast.lang"), true);
 });
 
 window.addEventListener("km-theme-applied", () => {
   applyShell();
 });
-window.addEventListener("hashchange", route);
+window.addEventListener("hashchange", () => {
+  // Ignore stale queued events after a rejected/restored hash navigation.
+  if (location.hash !== acceptedHash) return route();
+});
 boot();

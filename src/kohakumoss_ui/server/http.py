@@ -3,6 +3,9 @@
 import hmac
 import json
 import mimetypes
+import os
+import re
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -11,7 +14,8 @@ from urllib.parse import parse_qs, urlsplit
 from .. import paths
 from ..contract import appearance
 from ..contract import configs, datasets, doctor, knobs, launch, logs, runs
-from ..contract import history
+from ..contract import history, grabber
+from ..contract.annotations import AnnotationContract, AnnotationError, MAX_RESPONSE, strict_json
 from ..contract.root import TRAIN_SCRIPT, TrainerRoot
 from ..store import notebook, profile, queue
 from . import civitai
@@ -20,6 +24,42 @@ from . import civitai
 MAX_BODY = 1_000_000
 
 COOKIE_NAME = "km_token"
+
+# Windows resolves these suffixes from HKCR, where .js is often "text/plain" and
+# .css/.json are unreliable; a wrong type makes the browser reject module scripts.
+# The table wins over mimetypes, which stays as the fallback for everything else.
+STATIC_MIME = {
+    ".html": "text/html",
+    ".htm": "text/html",
+    ".js": "text/javascript",
+    ".mjs": "text/javascript",
+    ".css": "text/css",
+    ".json": "application/json",
+    ".map": "application/json",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".ico": "image/x-icon",
+    ".woff2": "font/woff2",
+    ".woff": "font/woff",
+    ".txt": "text/plain",
+}
+
+
+def _mime_for(name: str) -> str:
+    """Content-Type for a static asset, with UTF-8 declared for text-like types."""
+    suffix = Path(name).suffix.lower()
+    mime = STATIC_MIME.get(suffix) or mimetypes.guess_type(name)[0] or "application/octet-stream"
+    if mime.startswith("text/") or mime in {
+        "application/javascript",
+        "application/json",
+        "text/javascript",
+    }:
+        mime += "; charset=utf-8"
+    return mime
 
 
 def cookie_token(header: str | None) -> str:
@@ -36,7 +76,33 @@ class Api:
 
     def __init__(self, root: TrainerRoot, token: str):
         self.root = root
+        self.grabber = grabber.Grabber(root)
+        self.annotations = AnnotationContract(self.grabber)
+        self._translation = None
+        self._translation_lock = threading.Lock()
+        self._services_closed = False
         self.token = token
+
+    @property
+    def translation(self):
+        # Existing API construction and shutdown must never touch private state.
+        with self._translation_lock:
+            if self._services_closed:
+                raise AnnotationError(503, "UPSTREAM_UNAVAILABLE", "Service is closing", retryable=True)
+            if self._translation is None:
+                from ..contract.translation import TranslationService
+                self._translation = TranslationService(self.annotations)
+            return self._translation
+
+    def close_services(self):
+        with self._translation_lock:
+            self._services_closed = True
+            service = self._translation
+        try:
+            if service is not None:
+                service.close()
+        finally:
+            self.grabber.close()
 
     def token_ok(self, query: dict, header: str | None, cookie: str | None = None) -> bool:
         supplied = (query.get("token") or [""])[0] or header or cookie_token(cookie) or ""
@@ -289,7 +355,8 @@ class Handler(BaseHTTPRequestHandler):
     api: Api = None  # type: ignore[assignment]
 
     def log_message(self, fmt: str, *args) -> None:
-        if self.path.startswith("/api/") and self.command == "GET":
+        if (self.path.startswith(("/api/grabber/", "/api/translation/"))
+                or (self.path.startswith("/api/") and self.command == "GET")):
             return
         super().log_message(fmt, *args)
 
@@ -299,8 +366,10 @@ class Handler(BaseHTTPRequestHandler):
     def _send(self, status: int, body: bytes, mime: str = "application/json", extra: dict | None = None) -> None:
         self.send_response(status)
         self.send_header("Content-Type", mime)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
+        if status != 304:
+            self.send_header("Content-Length", str(len(body)))
+        if not any(key.lower() == "cache-control" for key in (extra or {})):
+            self.send_header("Cache-Control", "no-store")
         for key, value in (extra or {}).items():
             self.send_header(key, value)
         self.end_headers()
@@ -316,7 +385,114 @@ class Handler(BaseHTTPRequestHandler):
     def _error(self, status: int, message: str) -> None:
         self._json({"error": message}, status)
 
+    @staticmethod
+    def _workbench_path(path):
+        return any(path == prefix or path.startswith(prefix + "/") for prefix in
+                   ("/api/grabber/annotations", "/api/translation"))
+
+    def _workbench_json(self, status, payload):
+        raw = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8")
+        if len(raw) > MAX_RESPONSE:
+            raise AnnotationError(502, "UPSTREAM_PROTOCOL", "Response exceeds 16 MiB")
+        self._send(status, raw)
+
+    def _annotations(self, path, query=None, body=None):
+        route = path.removeprefix("/api/grabber/annotations/")
+        service = self.api.annotations
+        result = service.post(route, body) if body is not None else service.get(route, query or {})
+        self._workbench_json(*result)
+
+    def _translation(self, path, query=None, body=None):
+        route = path.removeprefix("/api/translation/")
+        service = self.api.translation
+        result = service.post(route, body) if body is not None else service.get(route, query or {})
+        self._workbench_json(*result)
+
+    def _workbench(self):
+        """New endpoints have strict parsing without changing any legacy API."""
+        parsed = urlsplit(self.path)
+        if not self._workbench_path(parsed.path):
+            return False
+        self.close_connection = True
+        try:
+            try:
+                if re.search(r"%(?![0-9a-fA-F]{2})", parsed.query):
+                    raise ValueError("Malformed percent encoding")
+                query = parse_qs(parsed.query, keep_blank_values=True, strict_parsing=True,
+                                 encoding="utf-8", errors="strict", max_num_fields=32)
+                if any(len(values) != 1 for values in query.values()):
+                    raise ValueError("Repeated query parameter")
+            except (ValueError, UnicodeError):
+                raise AnnotationError(400, "INVALID_REQUEST", "Invalid or repeated query parameters") from None
+            try:
+                authenticated = self.api.token_ok(query, self.headers.get("X-UI-Token"), self.headers.get("Cookie"))
+            except (ValueError, TypeError):
+                authenticated = False
+            if not authenticated:
+                raise AnnotationError(403, "AUTH_REQUIRED", "UI authentication required")
+            query.pop("token", None)
+            if self.command not in {"GET", "POST"}:
+                raise AnnotationError(405, "METHOD_NOT_ALLOWED", "Only GET and POST are supported")
+            if parsed.fragment:
+                raise AnnotationError(400, "INVALID_REQUEST", "Fragments are not supported")
+            lengths = self.headers.get_all("Content-Length", [])
+            if (self.headers.get_all("Transfer-Encoding") or len(lengths) > 1 or
+                    (lengths and re.fullmatch(r"[0-9]{1,10}", lengths[0]) is None)):
+                raise AnnotationError(400, "INVALID_REQUEST", "Invalid request framing")
+            length = int(lengths[0]) if lengths else 0
+            if length > MAX_BODY:
+                raise AnnotationError(413, "BODY_TOO_LARGE", "Request body exceeds 1000000 bytes")
+            body = None
+            if self.command == "POST":
+                if query:
+                    raise AnnotationError(400, "INVALID_REQUEST", "POST does not accept query fields")
+                types = self.headers.get_all("Content-Type", [])
+                if (len(types) != 1 or re.fullmatch(
+                        r'application/json(?:\s*;\s*charset\s*=\s*(?:utf-8|"utf-8"))?\s*',
+                        types[0], re.IGNORECASE) is None):
+                    raise AnnotationError(400, "INVALID_REQUEST", "Content-Type must be application/json UTF-8")
+                if len(lengths) != 1:
+                    raise AnnotationError(400, "INVALID_REQUEST", "Content-Length is required")
+                previous_timeout = self.connection.gettimeout()
+                try:
+                    self.connection.settimeout(30)
+                    raw = self.rfile.read(length)
+                    if len(raw) != length:
+                        raise ValueError("Incomplete body")
+                    body = strict_json(raw)
+                    if not isinstance(body, dict):
+                        raise ValueError("Expected an object")
+                except (ValueError, UnicodeError, RecursionError, OSError):
+                    raise AnnotationError(400, "INVALID_JSON", "Request must contain one complete JSON object") from None
+                finally:
+                    self.connection.settimeout(previous_timeout)
+            elif length:
+                raise AnnotationError(400, "INVALID_REQUEST", "GET does not accept a body")
+            if parsed.path.startswith("/api/grabber/annotations"):
+                self._annotations(parsed.path, query=query, body=body)
+            else:
+                self._translation(parsed.path, query=query, body=body)
+        except AnnotationError as exc:
+            self._workbench_json(exc.status, exc.payload)
+        except Exception:
+            error = AnnotationError(500, "INTERNAL", "Annotation workbench operation failed")
+            self._workbench_json(error.status, error.payload)
+        return True
+
+    def send_error(self, code, message=None, explain=None):
+        # BaseHTTPRequestHandler otherwise emits HTML for unimplemented verbs.
+        if self._workbench_path(urlsplit(getattr(self, "path", "")).path):
+            if code == 501:
+                self._workbench()
+            else:
+                error = AnnotationError(400, "INVALID_REQUEST", "Invalid HTTP request")
+                self._workbench_json(error.status, error.payload)
+            return
+        super().send_error(code, message, explain)
+
     def do_GET(self) -> None:
+        if self._workbench():
+            return
         parsed = urlsplit(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
@@ -349,7 +525,50 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._static(path.lstrip("/")[7:] if path.startswith("/assets/") else path.lstrip("/"))
 
+    def _grabber(self, path, query=None, body=None):
+        """Keep upstream failures out of the generic exception/response path."""
+        route = path.removeprefix("/api/grabber/")
+        try:
+            if body is not None:
+                self._json(self.api.grabber.post(route, body))
+            elif route == "preview":
+                params = parse_qs(urlsplit(self.path).query, keep_blank_values=True)
+                if any(len(params.get(key, [])) != 1 for key in ("path",)) or len(params.get("size", ["thumb"])) != 1:
+                    raise ValueError("invalid preview parameters")
+                preview = self.api.grabber.preview(params["path"][0], params.get("size", ["thumb"])[0])
+                validators = [value.strip().removeprefix("W/") for value in
+                              self.headers.get("If-None-Match", "").split(",")]
+                unchanged = preview.etag in validators or "*" in validators
+                self._send(304 if unchanged else 200, b"" if unchanged else preview.data, preview.mime, {
+                    "Cache-Control": "private, no-cache",
+                    "ETag": preview.etag,
+                    "Vary": "Cookie, X-UI-Token",
+                    "X-Content-Type-Options": "nosniff",
+                    "Content-Security-Policy": "default-src 'none'; sandbox",
+                    "Content-Disposition": "inline",
+                    "X-Preview-Width": str(preview.width),
+                    "X-Preview-Height": str(preview.height),
+                })
+            elif route == "file":
+                data, mime = self.api.grabber.file((query.get("path") or [""])[0])
+                self._send(200, data, mime, {
+                    "X-Content-Type-Options": "nosniff",
+                    "Content-Security-Policy": "default-src 'none'; sandbox",
+                    "Content-Disposition": "inline",
+                })
+            else:
+                self._json(self.api.grabber.get(route, query or {}))
+        except grabber.GrabberError as exc:
+            self._json(exc.payload, exc.status)
+        except (ValueError, KeyError):
+            self._error(400, "Invalid grabber source, fields, offsets or media path")
+        except Exception:
+            self._error(500, "Grabber operation failed; check local configuration")
+
     def _api_get(self, path: str, query: dict) -> None:
+        if path.startswith("/api/grabber/"):
+            self._grabber(path, query=query)
+            return
         api = self.api
         match path:
             case "/api/state":
@@ -411,10 +630,7 @@ class Handler(BaseHTTPRequestHandler):
         if not target.is_file():
             self._error(404, f"not found: {rel}")
             return
-        mime = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
-        if mime.startswith("text/") or mime in {"application/javascript", "application/json"}:
-            mime += "; charset=utf-8"
-        self._send(200, target.read_bytes(), mime, extra)
+        self._send(200, target.read_bytes(), _mime_for(target.name), extra)
 
     def _sse(self, query: dict) -> None:
         name = (query.get("name") or [""])[0]
@@ -482,6 +698,8 @@ class Handler(BaseHTTPRequestHandler):
             time.sleep(1.0)
 
     def do_POST(self) -> None:
+        if self._workbench():
+            return
         parsed = urlsplit(self.path)
         query = parse_qs(parsed.query)
         if not self.api.token_ok(query, self.headers.get("X-UI-Token"), self.headers.get("Cookie")):
@@ -495,6 +713,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length") or "0")
+            if length < 0:
+                raise ValueError("invalid content length")
             if length > MAX_BODY:
                 self._error(413, "body too large")
                 return
@@ -505,6 +725,9 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("request body must be a JSON object") from exc
             if not isinstance(body, dict):
                 raise ValueError("body must be an object")
+            if parsed.path.startswith("/api/grabber/"):
+                self._grabber(parsed.path, body=body)
+                return
             match parsed.path:
                 case "/api/run/start":
                     self._json(self.api.start_run(body))
@@ -586,6 +809,8 @@ class Handler(BaseHTTPRequestHandler):
             self._error(500, f"{type(exc).__name__}: {exc}")
 
     def do_DELETE(self) -> None:
+        if self._workbench():
+            return
         parsed = urlsplit(self.path)
         query = parse_qs(parsed.query)
         if not self.api.token_ok(query, self.headers.get("X-UI-Token"), self.headers.get("Cookie")):
@@ -612,6 +837,16 @@ def make_server(root: TrainerRoot, host: str, port: int, token: str) -> Threadin
     """Bind the UI server; port 0 lets the OS pick a free one."""
     api = Api(root, token)
     handler = type("BoundHandler", (Handler,), {"api": api})
-    server = ThreadingHTTPServer((host, port), handler)
+    class WorkbenchServer(ThreadingHTTPServer):
+        # SO_REUSEADDR on Windows lets a second instance steal a live port.
+        allow_reuse_address = os.name != "nt"
+
+        def server_close(self):
+            try:
+                api.close_services()
+            finally:
+                super().server_close()
+
+    server = WorkbenchServer((host, port), handler)
     server.daemon_threads = True
     return server

@@ -9,7 +9,7 @@
 - 通过 **CLI + 文件契约** 对接 `../KohakuMossTrainer`：不 import 训练器、不改训练器源码、不写它的运行产物。
 - `src/kohakumoss_ui/contract/` 是唯一知道训练器名字的层（`kogine`、`metrics.jsonl`、knob 名、run 目录布局、doctor JSON）。上游漂移只改这里 + 补测试，不要把训练器概念漏进 `server/` 或 `web/`。
 - 默认只监听 `127.0.0.1` 并用一次性 token；服务能启停训练进程，不要绑公网。
-- 当前目录不是 Git 仓库；即使以后初始化，也不要擅自 add/commit/push。
+- 当前目录是独立 Git 仓库；不要擅自 add/commit/push。
 
 ## 布局
 
@@ -27,6 +27,7 @@ src/kohakumoss_ui/
     index.html base.css app.css
     api.js format.js app.js views.js settings.js appearance.js
     studio.js heatmap.js 训练主页 / 记事本 / 队列（事件走 data-act 委托）
+    grabber.js           图片采集单来源配置 / 当前任务结果，由 studio.js 导出；路由调用 __studioCleanup 清理轮询与事件
     i18n.js lang/{en,zh}.json
     data/knob-docs.json  144 个参数的 en/zh 解释 + 训练器文档锚点
     themes/{kohaku,soul,teletype}.css
@@ -44,7 +45,7 @@ tests/                   契约 / 启动 / 外观 / teletype 门禁 / store / hi
 - 分层固定：CUSTOM BACKGROUND 只管一件事 —— 有没有壁纸（`data-bg="on"` 时 `.app` 透明，壁纸只从控件之间的空隙和页边距透出来；关闭时整页用主题 canvas）。**GLASS 是唯一让表面变薄的开关**：玻璃关时 `.aside` / `.mast` / `.foot` / `.box` / `.runner` 一律 `background:var(--panel)` 实心；玻璃开时才走 `color-mix(in srgb, var(--panel) calc(100% * var(--surface-alpha)), transparent)`，并且只有 `.aside` / `.mast` / `.foot` 带 `backdrop-filter`。`.app` 从不读 `--surface-alpha`，任何开关都不得改变几何（不许桌垫 padding / `calc()` 高度）。「背景开 + 玻璃关 = 82%/92% 半透明」的旧说法是错的，已删除：玻璃关就是实心。
 - `teletype` 的控件用薄纸（surface opacity）代替磨砂，但禁止 `backdrop-filter`：打孔带保持实色、控件透明度与滑杆 1:1（不设下限，可读性由 veil 与 MASK 保证），壁纸只在控件之间可见。改外观前先读 `docs/teletype.md`（§2、§6、§9）。
 - `main` 的顶边距和 `.vhead-sticky` 的 `padding-top` 是 **1:1 对齐**的一对数（relaxed 16px / compact 10px）；改 `main` 的 padding 必须同步改它，否则粘性表头滚动时会跳一下。
-- 侧边栏顺序固定在 `web/index.html` 的 nav 里，别随手调：工作台 = 01 新建训练 `#/new`、02 训练队列 `#/queue`、03 训练记录 `#/runs`；数据 = 04 数据集 `#/datasets`、05 产物 `#/artifacts`；工作室 = 06 训练主页 `#/profile`、07 训练记事本 `#/notebook`；系统 = 08 环境体检 `#/doctor`、09 设置 `#/settings`。产物没有独立分组了（`nav.group.artifacts` 已从 en/zh 两边同时删除），它挂在数据组下面。
+- 侧边栏顺序固定在 `web/index.html` 的 nav 里，别随手调：工作台 = 01 新建训练 `#/new`、02 训练队列 `#/queue`、03 训练记录 `#/runs`；数据 = 04 图片采集 `#/grabber`、05 数据集 `#/datasets`、06 产物 `#/artifacts`；工作室 = 07 训练主页 `#/profile`、08 训练记事本 `#/notebook`；系统 = 09 环境体检 `#/doctor`、10 设置 `#/settings`。产物没有独立分组了（`nav.group.artifacts` 已从 en/zh 两边同时删除），它挂在数据组下面。
 - 界面文案统一叫「训练」：词典里 `nav.queue` / `nav.profile` / `nav.notebook` 分别是训练队列 / 训练主页 / 训练记事本，旧的叫法已从 en/zh 两边彻底清掉，别再引回来。
 - 面板类控件点击即编辑：点字段本身进编辑态，不要在文字旁边再加 RENAME / UPLOAD 这类文字按钮（`#/profile` 的名字与头像已改成点击即编辑与点击即上传）。
 - 数字列一律 `.led th.num{text-align:right}` 配 `.led td.num`，表头与单元格同侧右对齐；例外是数据集页的「图片」「标注」两列和训练队列的「耗时」列，按用户要求保持左对齐——队列那列用 `.q-table td.elapsed`（保留 `tabular-nums`、带 `min-inline-size`）而不挂 `num`，表头也要同步去掉 `num` 类，两边才同侧。

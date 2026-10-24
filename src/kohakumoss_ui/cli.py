@@ -7,13 +7,14 @@ import sys
 import threading
 
 from . import paths
-from .contract import discover
+from .contract import discover, launch, state
 from .server.http import make_server
 from .shell import browser, native
 from .store import queue
 
 
 QUEUE_INTERVAL = 5.0
+CLEANUP_TIMEOUT = 5.0
 
 
 def start_scheduler(root, stop: threading.Event, interval: float = QUEUE_INTERVAL) -> threading.Thread:
@@ -31,6 +32,44 @@ def start_scheduler(root, stop: threading.Event, interval: float = QUEUE_INTERVA
     thread = threading.Thread(target=loop, name="km-queue", daemon=True)
     thread.start()
     return thread
+
+
+def stop_training_processes(timeout: float = CLEANUP_TIMEOUT) -> None:
+    """Stop the trainers this UI started so none survives as an orphan.
+
+    The sweep runs in a daemon thread: a trainer that ignores both the graceful
+    and the forced request must never keep the UI process alive. ``timeout``
+    bounds the whole sweep, and failures are swallowed because shutdown must
+    continue regardless.
+    """
+    try:
+        names = list(state.all_entries())
+    except Exception:
+        return
+    if not names:
+        return
+
+    def sweep() -> None:
+        for name in names:
+            try:
+                info = state.status(name)
+                if info is None or not info.get("alive"):
+                    continue
+                result = launch.stop(name)
+                if not result.get("stopped"):
+                    launch.stop(name, force=True)
+            except Exception:
+                continue
+
+    worker = threading.Thread(target=sweep, name="km-cleanup", daemon=True)
+    worker.start()
+    worker.join(timeout)
+    if worker.is_alive():
+        print(
+            f"kohakumoss-ui: trainer cleanup still running after {timeout:.0f}s; "
+            "some runs may survive",
+            file=sys.stderr,
+        )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -98,6 +137,9 @@ def main(argv: list[str] | None = None) -> int:
         pass
     finally:
         stop_scheduler.set()
+        # A trainer spawned with CREATE_NEW_PROCESS_GROUP ignores the console
+        # Ctrl+C, so it would keep running (and holding VRAM) after the UI dies.
+        stop_training_processes()
         server.server_close()
     return 0
 

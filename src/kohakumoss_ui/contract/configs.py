@@ -2,6 +2,7 @@
 
 import ast
 import json
+import os
 import subprocess
 import threading
 import time
@@ -84,6 +85,9 @@ def load_config(root: TrainerRoot, relpath: str, max_age: float = 5.0) -> dict:
         cwd=root.root,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         timeout=60,
     )
     if result.returncode != 0:
@@ -107,6 +111,9 @@ def check_config(root: TrainerRoot, relpath: str) -> dict:
         cwd=root.root,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         timeout=300,
     )
     output = (result.stdout + result.stderr).strip()

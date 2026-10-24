@@ -15,6 +15,30 @@ def _looks_like_root(path: Path) -> bool:
     return (path / TRAIN_SCRIPT).is_file() and (path / "configs").is_dir()
 
 
+def _venv_bin(root: Path, name: str) -> Path | None:
+    """Find a tool shipped in the trainer's venv, on POSIX or Windows.
+
+    POSIX layouts use ``.venv/bin/<name>`` while Windows puts console scripts in
+    ``.venv/Scripts/<name>.exe``. Each branch also probes the other layout as a
+    compatibility fallback for WSL checkouts or hand-made venvs.
+    """
+    if os.name == "nt":
+        candidates = (
+            root / ".venv" / "Scripts" / f"{name}.exe",
+            root / ".venv" / "Scripts" / name,
+            root / ".venv" / "bin" / name,
+        )
+    else:
+        candidates = (
+            root / ".venv" / "bin" / name,
+            root / ".venv" / "Scripts" / f"{name}.exe",
+        )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 @dataclass(frozen=True)
 class TrainerRoot:
     """One resolved trainer checkout plus the interpreters it ships."""
@@ -26,29 +50,29 @@ class TrainerRoot:
         override = os.environ.get("KOHAKUMOSS_PYTHON", "").strip()
         if override:
             return Path(override).expanduser()
-        venv = self.root / ".venv" / "bin" / "python"
-        return venv if venv.is_file() else Path(sys.executable)
+        venv = _venv_bin(self.root, "python")
+        return venv if venv is not None else Path(sys.executable)
 
     @property
     def kogine(self) -> Path | None:
-        venv = self.root / ".venv" / "bin" / "kogine"
-        if venv.is_file():
+        venv = _venv_bin(self.root, "kogine")
+        if venv is not None:
             return venv
         found = shutil.which("kogine")
         return Path(found) if found else None
 
     @property
     def config_bin(self) -> Path | None:
-        venv = self.root / ".venv" / "bin" / "kohakumoss-config"
-        if venv.is_file():
+        venv = _venv_bin(self.root, "kohakumoss-config")
+        if venv is not None:
             return venv
         found = shutil.which("kohakumoss-config")
         return Path(found) if found else None
 
     @property
     def doctor_bin(self) -> Path | None:
-        venv = self.root / ".venv" / "bin" / "kohakumoss-doctor"
-        if venv.is_file():
+        venv = _venv_bin(self.root, "kohakumoss-doctor")
+        if venv is not None:
             return venv
         found = shutil.which("kohakumoss-doctor")
         return Path(found) if found else None

@@ -74,7 +74,17 @@ def _backup(path: Path) -> None:
     target = path.with_name(path.name + BACKUP_SUFFIX)
     try:
         tmp = target.with_name(target.name + ".tmp")
-        tmp.write_bytes(payload)
+        # Backups can contain credentials too: create private from the outset.
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, MODE)
+        fchmod = getattr(os, "fchmod", None)
+        with os.fdopen(fd, "wb") as sink:
+            if fchmod is not None:
+                # POSIX: tighten the open inode itself, never a re-resolved path.
+                fchmod(sink.fileno(), MODE)
+            sink.write(payload)
+        if fchmod is None:
+            # Windows has no fchmod; chmod there only clears the read-only flag.
+            os.chmod(tmp, MODE)
         os.replace(tmp, target)
     except OSError:
         pass

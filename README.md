@@ -12,6 +12,23 @@ backend (stdlib http.server)
    trainer process                   run directory
 ```
 
+## Version 1.0
+
+This is the 1.0 release of the UI.
+
+**Windows support is not fully tested.** The UI itself and its tool discovery, process
+handling and encodings were hardened for Windows, but the grabber backend still contains
+POSIX assumptions and no real Windows run of the full flow has been done. Issues are welcome.
+
+Issues and pull requests are welcome. Please include the OS, the Python version and the
+relevant log output.
+
+## Interface reference
+
+[接口参考（中文）](docs/interfaces.md) covers the current HTTP routes, SSE events,
+CLI options, trainer file/process contract, and local security limits. Historical
+plans under `docs/plans/` are not the current API specification.
+
 ## Install
 
 Use the trainer's own virtualenv so the UI runs on the same Python and sees `kogine`:
@@ -47,6 +64,25 @@ kohakumoss-ui KohakuMossTrainer 0.1.0
 The root is discovered from `--root`, `KOHAKUMOSS_ROOT`, the current directory, or a sibling
 `KohakuMossTrainer` checkout. `KOHAKUMOSS_RUNS` and `KOHAKUMOSS_PYTHON` override the runs root
 and interpreter.
+
+## ArtistSourceGrabber integration
+
+The collection workspace uses the same UI shell and a dedicated backend adapter,
+not the Grabber's old page. Start the UI normally, then explicitly start the
+collection service from the workspace. No source login, model load or download
+runs automatically. See [采集接入与 API / lifecycle](docs/grabber.md).
+
+The default checkout is the trainer's sibling `ArtistSourceGrabber`; override it
+with `KOHAKUMOSS_GRABBER_ROOT`. `KOHAKUMOSS_GRABBER_PYTHON` overrides its interpreter
+(default: the Grabber's `.venv`, then the current Python). Dependencies must already
+be installed. This adapter currently targets POSIX. Credentials are private local
+UI state files and are never returned as plaintext secrets by the API.
+
+**Closing the UI process leaves its Grabber process and collection running.**
+Record the status `pid` / `port` first: a restarted UI does not adopt the old service
+or recover task history. Stop remains cooperative; wait for a terminal task status
+before explicitly shutting down the original ASG service. Full details and the
+local-only security boundary are in the integration guide above.
 
 ## What works
 

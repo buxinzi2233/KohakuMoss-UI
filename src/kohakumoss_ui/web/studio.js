@@ -11,6 +11,7 @@
  * colour, no radius, no shadow, no gradient. Numbers live in .num / .ledger td.v,
  * status text in the .st stamp family, one frame per independent reading region.
  */
+export { grabberView } from "./grabber.js";
 import * as fallbackApi from "./api.js";
 import { bar, duration, esc, pct, when } from "./format.js";
 import { renderHeatmap, renderHistory, renderPublishStatus } from "./heatmap.js";

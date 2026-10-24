@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kohakumoss-ui"
-version = "0.1.0"
+version = "1.0.0"
 description = "Local web UI for the KohakuMoss trainer, pluggable over its CLI contract"
 readme = "README.md"
 requires-python = ">=3.10"
