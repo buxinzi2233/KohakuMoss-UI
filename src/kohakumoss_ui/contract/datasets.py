@@ -6,8 +6,8 @@ import time
 from pathlib import Path
 
 from . import configs
+from .gbc_data_common import declared_counts
 from .root import TrainerRoot
-
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
 _CACHE: dict[str, object] = {"at": 0.0, "payload": None}
@@ -92,17 +92,17 @@ def scan(root: TrainerRoot, refresh: bool = False) -> dict:
         if not dataset.is_absolute():
             dataset = root.root / dataset
         exists = dataset.is_dir()
-        counts = _count(dataset) if exists else {"images": 0, "captions": 0, "files": 0, "truncated": False}
+        if item["source"] == "gbc":
+            counts = declared_counts(dataset, item["options"].get("shards"))
+        else:
+            counts = _count(dataset) if exists else {"images": 0, "captions": 0, "files": 0, "truncated": False}
         result.append(
             {
                 **item,
                 "template": not any(config.startswith("configs/user/") for config in item["configs"]),
                 "absolute": str(dataset),
                 "exists": exists,
-                "images": counts["images"],
-                "captions": counts["captions"],
-                "files": counts["files"],
-                "truncated": counts["truncated"],
+                **counts,
                 "cache": _cache_info(dataset) if exists else {"present": False, "files": 0, "bytes": 0},
             }
         )

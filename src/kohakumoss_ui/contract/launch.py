@@ -3,13 +3,12 @@
 import os
 import signal
 import subprocess
+import threading
 import time
-from pathlib import Path
 
 from .. import paths
 from . import configs, state
 from .root import TRAIN_SCRIPT, TrainerRoot
-
 
 _RESERVED_WINDOWS_NAMES = frozenset(
     ["CON", "PRN", "AUX", "NUL"]
@@ -71,13 +70,91 @@ def command(root: TrainerRoot, config_rel: str, overrides: dict) -> list[str]:
     return cmd
 
 
+class _UnconfirmedSpawn(RuntimeError):
+    """A child exists but teardown was not proven; its lease must stay fenced."""
+
+
+def _cleanup_owned(process, expected):
+    """Retire only this Popen's verified new-session group, or fail closed."""
+    from .gbc_process import group_alive
+    try:
+        if process.poll() is None:
+            if not state.identity_matches(process.pid, expected):
+                return False
+            os.killpg(expected["group"], signal.SIGKILL)
+        process.wait(timeout=5)
+        return not group_alive(process.pid)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def start(
+    root: TrainerRoot,
+    config_rel: str = "",
+    overrides: dict | None = None,
+    run_name: str | None = None,
+    *,
+    draft_ref: dict | None = None,
+) -> dict:
+    """Shared manual/queue entry: guarded config and atomic generation lease."""
+    if draft_ref is not None:
+        if config_rel or overrides or run_name:
+            raise ValueError("draftRef cannot be combined with legacy config or overrides")
+        try:
+            from .training_drafts import resolve_for_launch
+        except ImportError:
+            from .gbc_schema import GbcError
+            raise GbcError(409, "UNSUPPORTED_CAPABILITY", "Training draft launch adapter is not available") from None
+        from .training_drafts import DraftError
+        try:
+            config_rel = str(resolve_for_launch(root, draft_ref))
+        except DraftError as exc:
+            from .gbc_schema import GbcError
+            raise GbcError(409, exc.code, str(exc)) from None
+    else:
+        target = (root.root / config_rel).resolve()
+        allowed = (root.root / "configs").resolve()
+        if not config_rel or allowed not in target.parents:
+            raise ValueError("config path must stay under configs/")
+    if os.name == "nt":
+        result, _ = _start_unlocked(root, config_rel, overrides, run_name)
+        return result
+    from .gbc_lease import Lease
+    from .gbc_process import group_alive
+    lease = Lease("training")
+    process = None
+    expected = None
+    try:
+        result, process = _start_unlocked(root, config_rel, overrides, run_name)
+        expected = state.process_identity(process.pid)
+        lease.bind(process.pid, expected)
+    except BaseException as exc:
+        if isinstance(exc, _UnconfirmedSpawn):
+            lease.abandon()
+        elif process is None or _cleanup_owned(process, expected):
+            lease.release()
+        else:
+            lease.abandon()
+        raise
+
+    def release_when_reaped():
+        process.wait()
+        if group_alive(process.pid):
+            lease.abandon()
+        else:
+            lease.release()
+
+    threading.Thread(target=release_when_reaped, name="training-lease", daemon=True).start()
+    return result
+
+
+def _start_unlocked(
     root: TrainerRoot,
     config_rel: str,
     overrides: dict | None = None,
     run_name: str | None = None,
-) -> dict:
-    """Spawn `kogine run` in its own process group and record its pid."""
+) -> tuple:
+    """Spawn `kogine run` while the caller owns the shared resource lease."""
     overrides = dict(overrides or {})
     if run_name:
         overrides["RUN_NAME"] = run_name
@@ -108,15 +185,26 @@ def start(
             env=env,
         )
 
-    state.register(name, process.pid, config_rel, cmd, str(log_path))
-    time.sleep(0.15)
-    return {
-        "name": name,
-        "pid": process.pid,
-        "alive": state.pid_alive(process.pid),
-        "command": cmd,
-        "log": str(log_path),
-    }
+    expected = None
+    try:
+        expected = state.process_identity(process.pid)
+        state.register(name, process.pid, config_rel, cmd, str(log_path))
+        time.sleep(0.15)
+        return {
+            "name": name,
+            "pid": process.pid,
+            "alive": state.pid_alive(process.pid),
+            "command": cmd,
+            "log": str(log_path),
+        }, process
+    except BaseException as exc:
+        # Preserve the outer fence if an already-created group cannot be reaped.
+        if os.name == "nt":
+            _taskkill(process.pid, force=True)
+            process.wait(timeout=5)
+        elif not _cleanup_owned(process, expected):
+            raise _UnconfirmedSpawn("New process cleanup is unconfirmed; recovery required") from exc
+        raise
 
 
 def _taskkill(pid: int, force: bool) -> bool:
@@ -169,20 +257,26 @@ def stop(name: str, force: bool = False) -> dict:
     if item is None:
         return {"stopped": False, "reason": "not managed by this UI"}
     pid = int(item.get("pid", 0))
-    if not item.get("alive"):
-        return {"stopped": False, "reason": "process is not alive", "pid": pid}
-
-    # Windows has no signal.SIGKILL, so the signal is built only after the
-    # platform branch; evaluating it up front raised AttributeError there.
+    # Keep tested Windows taskkill behavior; no Linux identity guarantee there.
     if os.name == "nt":
+        if not item.get("alive"):
+            return {"stopped": False, "reason": "process is not alive", "pid": pid}
         return _stop_windows(pid, force)
 
+    expected = item.get("identity")
+    recovery = {"stopped": False, "pid": pid, "code": "RECOVERY_REQUIRED",
+                "reason": "Process identity missing or changed; manual recovery required"}
+    if not expected or item.get("recoveryRequired"):
+        return recovery
+    if not item.get("alive"):
+        return {"stopped": False, "reason": "process is not alive", "pid": pid}
+    # Recheck immediately before signaling the ORIGINAL group, never getpgid()
+    # on a reused PID and never fall back to an unverified kill(pid).
+    if not state.identity_matches(pid, expected):
+        return recovery
     sig = signal.SIGKILL if force else signal.SIGTERM
     try:
-        os.killpg(os.getpgid(pid), sig)
-    except (ProcessLookupError, PermissionError, OSError):
-        try:
-            os.kill(pid, sig)
-        except OSError:
-            return {"stopped": False, "reason": "signal failed", "pid": pid}
+        os.killpg(expected["group"], sig)
+    except OSError:
+        return {"stopped": False, "reason": "signal failed", "pid": pid}
     return _await_exit(pid, time.time() + (2.0 if force else 15.0), sig.name)

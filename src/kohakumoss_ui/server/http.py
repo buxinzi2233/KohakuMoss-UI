@@ -12,14 +12,30 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from .. import paths
-from ..contract import appearance
-from ..contract import configs, datasets, doctor, knobs, launch, logs, runs
-from ..contract import history, grabber
-from ..contract.annotations import AnnotationContract, AnnotationError, MAX_RESPONSE, strict_json
+from ..contract import (
+    appearance,
+    configs,
+    datasets,
+    doctor,
+    grabber,
+    history,
+    knobs,
+    launch,
+    logs,
+    runs,
+)
+from ..contract.annotations import (
+    MAX_RESPONSE,
+    AnnotationContract,
+    AnnotationError,
+    strict_json,
+)
+from ..contract.gbc_schema import VERSION as GBC_VERSION
+from ..contract.gbc_schema import GbcError
 from ..contract.root import TRAIN_SCRIPT, TrainerRoot
 from ..store import notebook, profile, queue
+from ..store.annotations import StoreError
 from . import civitai
-
 
 MAX_BODY = 1_000_000
 
@@ -79,6 +95,7 @@ class Api:
         self.grabber = grabber.Grabber(root)
         self.annotations = AnnotationContract(self.grabber)
         self._translation = None
+        self._gbc = None
         self._translation_lock = threading.Lock()
         self._services_closed = False
         self.token = token
@@ -94,15 +111,30 @@ class Api:
                 self._translation = TranslationService(self.annotations)
             return self._translation
 
+    @property
+    def gbc(self):
+        with self._translation_lock:
+            if self._services_closed:
+                raise GbcError(503, "WORKER_UNAVAILABLE", "Service is closing")
+            if self._gbc is None:
+                from ..contract.gbc import GbcService
+                self._gbc = GbcService(self.root)
+            return self._gbc
+
     def close_services(self):
         with self._translation_lock:
             self._services_closed = True
             service = self._translation
+            gbc_service = self._gbc
         try:
             if service is not None:
                 service.close()
         finally:
-            self.grabber.close()
+            try:
+                if gbc_service is not None:
+                    gbc_service.close()
+            finally:
+                self.grabber.close()
 
     def token_ok(self, query: dict, header: str | None, cookie: str | None = None) -> bool:
         supplied = (query.get("token") or [""])[0] or header or cookie_token(cookie) or ""
@@ -175,14 +207,20 @@ class Api:
         return datasets.scan(self.root, refresh=refresh)
 
     def start_run(self, body: dict) -> dict:
-        rel = str(body.get("config") or "")
-        self._guard_config(rel)
-        overrides = body.get("overrides") or {}
-        if not isinstance(overrides, dict):
-            raise ValueError("overrides must be an object")
-        clean = {str(key): str(value) for key, value in overrides.items()}
-        name = body.get("name") or None
-        payload = launch.start(self.root, rel, clean, name)
+        if "draftRef" in body:
+            if set(body) != {"draftRef"}:
+                raise ValueError("draftRef cannot be combined with config, overrides, or name")
+            self.gbc.get("capabilities")  # Reconnect the persisted draft resolver after restart.
+            payload = launch.start(self.root, draft_ref=body["draftRef"])
+        else:
+            rel = str(body.get("config") or "")
+            self._guard_config(rel)
+            overrides = body.get("overrides") or {}
+            if not isinstance(overrides, dict):
+                raise ValueError("overrides must be an object")
+            clean = {str(key): str(value) for key, value in overrides.items()}
+            name = body.get("name") or None
+            payload = launch.start(self.root, rel, clean, name)
         # A manual start must not fight the scheduler for the GPU.
         try:
             queue.pause_for_manual()
@@ -355,7 +393,7 @@ class Handler(BaseHTTPRequestHandler):
     api: Api = None  # type: ignore[assignment]
 
     def log_message(self, fmt: str, *args) -> None:
-        if (self.path.startswith(("/api/grabber/", "/api/translation/"))
+        if (self.path.startswith(("/api/grabber/", "/api/translation/", "/api/gbc/"))
                 or (self.path.startswith("/api/") and self.command == "GET")):
             return
         super().log_message(fmt, *args)
@@ -388,13 +426,19 @@ class Handler(BaseHTTPRequestHandler):
     @staticmethod
     def _workbench_path(path):
         return any(path == prefix or path.startswith(prefix + "/") for prefix in
-                   ("/api/grabber/annotations", "/api/translation"))
+                   ("/api/grabber/annotations", "/api/translation", "/api/gbc/v1"))
 
     def _workbench_json(self, status, payload):
+        if urlsplit(self.path).path.startswith("/api/gbc/v1"):
+            payload = {"apiVersion": GBC_VERSION, **payload}
         raw = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8")
         if len(raw) > MAX_RESPONSE:
             raise AnnotationError(502, "UPSTREAM_PROTOCOL", "Response exceeds 16 MiB")
-        self._send(status, raw)
+        extra = None
+        if urlsplit(self.path).path in {"/api/gbc/v1/datasets/media", "/api/gbc/v1/graphs/media"}:
+            extra = {"X-Content-Type-Options": "nosniff",
+                     "Content-Security-Policy": "default-src 'none'; sandbox"}
+        self._send(status, raw, extra=extra)
 
     def _annotations(self, path, query=None, body=None):
         route = path.removeprefix("/api/grabber/annotations/")
@@ -425,7 +469,20 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, UnicodeError):
                 raise AnnotationError(400, "INVALID_REQUEST", "Invalid or repeated query parameters") from None
             try:
-                authenticated = self.api.token_ok(query, self.headers.get("X-UI-Token"), self.headers.get("Cookie"))
+                if parsed.path.startswith("/api/gbc/v1"):
+                    tokens = self.headers.get_all("X-UI-Token", [])
+                    hosts = self.headers.get_all("Host", [])
+                    port = self.server.server_address[1]
+                    allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
+                    authenticated = ("token" not in query and len(tokens) == 1 and
+                                     self.api.token_ok({}, tokens[0]))
+                    if len(hosts) != 1 or hosts[0] not in allowed_hosts:
+                        raise GbcError(403, "PERMISSION_DENIED", "Loopback Host required")
+                    origins = self.headers.get_all("Origin", [])
+                    if origins and (len(origins) != 1 or origins[0] != "http://" + hosts[0]):
+                        raise GbcError(403, "PERMISSION_DENIED", "Same-origin request required")
+                else:
+                    authenticated = self.api.token_ok(query, self.headers.get("X-UI-Token"), self.headers.get("Cookie"))
             except (ValueError, TypeError):
                 authenticated = False
             if not authenticated:
@@ -470,9 +527,14 @@ class Handler(BaseHTTPRequestHandler):
                 raise AnnotationError(400, "INVALID_REQUEST", "GET does not accept a body")
             if parsed.path.startswith("/api/grabber/annotations"):
                 self._annotations(parsed.path, query=query, body=body)
+            elif parsed.path.startswith("/api/gbc/v1"):
+                route = parsed.path.removeprefix("/api/gbc/v1/")
+                service = self.api.gbc
+                result = service.post(route, body) if body is not None else service.get(route, query)
+                self._workbench_json(*result)
             else:
                 self._translation(parsed.path, query=query, body=body)
-        except AnnotationError as exc:
+        except (AnnotationError, GbcError, StoreError) as exc:
             self._workbench_json(exc.status, exc.payload)
         except Exception:
             error = AnnotationError(500, "INTERNAL", "Annotation workbench operation failed")
@@ -761,6 +823,8 @@ class Handler(BaseHTTPRequestHandler):
                     self._json(self.api.sync_civitai(body))
                 case _:
                     self._error(404, f"unknown endpoint {parsed.path}")
+        except GbcError as exc:
+            self._json(exc.payload, exc.status)
         except FileNotFoundError as exc:
             self._error(404, f"not found: {exc}")
         except (ValueError, KeyError) as exc:

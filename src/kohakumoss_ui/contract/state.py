@@ -122,6 +122,23 @@ def pid_alive(pid: int) -> bool:
     return _alive_posix(pid)
 
 
+def process_identity(pid: int) -> dict | None:
+    """Linux boot/starttime/original PGID, not PID existence. Windows unchanged."""
+    if os.name == "nt" or pid <= 0:
+        return None
+    from .gbc_process import identity
+    return identity(pid)
+
+
+def identity_matches(pid: int, expected) -> bool:
+    if (not isinstance(expected, dict) or set(expected) != {"boot", "start", "group"}
+            or type(expected["group"]) is not int or expected["group"] != pid
+            or not isinstance(expected["boot"], str) or not expected["boot"]
+            or not isinstance(expected["start"], str) or not expected["start"]):
+        return False
+    return process_identity(pid) == expected
+
+
 def register(name: str, pid: int, config: str, command: list[str], log_path: str) -> None:
     """Record a child process so its state survives a UI restart."""
     with _LOCK:
@@ -132,6 +149,7 @@ def register(name: str, pid: int, config: str, command: list[str], log_path: str
             "command": command,
             "log_path": log_path,
             "started_at": time.time(),
+            "identity": process_identity(pid),
         }
         _write(data)
 
@@ -159,5 +177,14 @@ def status(name: str) -> dict | None:
     if item is None:
         return None
     result = dict(item)
-    result["alive"] = pid_alive(int(item.get("pid", 0)))
+    pid = int(item.get("pid", 0))
+    live = pid_alive(pid)
+    if os.name == "nt":
+        result["alive"] = live
+        result["identityVerified"] = None  # Existing Windows liveness semantics only.
+    else:
+        verified = identity_matches(pid, item.get("identity")) if live else False
+        result["alive"] = live and verified
+        result["identityVerified"] = verified
+        result["recoveryRequired"] = live and not verified
     return result
