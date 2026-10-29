@@ -144,10 +144,11 @@ class StopWindowsTests(unittest.TestCase):
 
 class StopPosixTests(unittest.TestCase):
     def test_posix_stop_signals_the_process_group(self):
+        identity = {"boot": "fixture-boot", "start": "123", "group": 4242}
         with mock.patch("os.name", "posix"), mock.patch.object(
-            launch.state, "status", return_value={"pid": 4242, "alive": True}
+            launch.state, "status", return_value={"pid": 4242, "alive": True, "identity": identity}
         ), mock.patch.object(launch.state, "pid_alive", return_value=False), mock.patch.object(
-            launch.os, "getpgid", return_value=4242
+            launch.state, "process_identity", return_value=identity
         ), mock.patch.object(launch.os, "killpg") as group_kill:
             result = launch.stop("run")
         self.assertTrue(result["stopped"])

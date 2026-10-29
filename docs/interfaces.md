@@ -394,3 +394,75 @@ profile/notebook/queue/civitai 使用 [store/jsonfile.py](../src/kohakumoss_ui/s
 - 前端客户端集中在 web/api.js，静态 ES modules，无独立构建链。参数说明数据在 `web/data/knob-docs.json`；不要复制成第二套固定 knob 表。
 
 本页验证范围：对照上述真实源码的路由、CLI 解析器、SSE emit 与数据模型，检查文档本地链接及最小请求示例；没有启动服务器、训练器、GPU 检查或 Civitai 网络请求。2026-10-24 增补标注工作台/翻译接口时，逐个核对了 `contract/annotations.py`、`contract/translation.py`、`contract/translation_schema.py`、`server/http.py` 与 ASG `app.py`/`annotations.py` 的路由字符串与 schema 表，没有调用真实 provider 或写入真实图库。计划文档保留历史意义，不作为当前接口实现的证明。
+
+## GBC 工作区 / GBC workspace (v1)
+
+### 页面和操作边界 / Routes and action boundaries
+
+`#/datasets` 的 **GBC 工作区**入口打开 `#/datasets/gbc`，不改变侧栏编号。环境、生成任务、数据包、Caption 与草稿使用同一工作台语义主题；不增加新主题、壁纸层或 blur。
+
+The **GBC workspace** link on `#/datasets` opens `#/datasets/gbc`. It reuses the existing shell and themes. Its four tabs are Environment, Generation tasks, Dataset packages, and Caption & draft. No process, configuration execution, model download or remote call occurs merely by opening the page.
+
+1. 显式登记现有 `input/output/model` 根目录、`generator/data` Python 环境，并勾选信任确认。登记不是执行。版本与 doctor 是独立的显式生成器探测；数据环境通过导入/验证检查。
+2. 选择 `replay`（已有轨迹）或有限 `qwen35-local-v1`（本地新图）。后者要求已登记本地 `qwen3_5`、`owlv2`、`gemma3_text` 模型目录，只接受受限安全权重；不接受 Python/任意 engine/CLI 参数/远程模型 ID。能力支持不代表环境已安装，官方配置不保证 8 GiB 可运行。
+3. 创建冻结任务 → 显式配置检查 → 读取检查后的 task revision / validationId → 显式启动生成。停止是请求，必须等待作业终态；强停另行确认。退出码 0 仍可能为 partial/unchecked，不等于完整语义验证。
+4. 导入标准数据包会复制到新的已授权输出目录并验证；导出必须显式从当前作业 artifact 打包。源文件不覆盖、不修复。查看样本页不代表完整验证。
+5. 选择数据集、非空分片集合、可信 base config 与完整 caption options，明确修正居中裁剪/不翻转冲突后创建不可变草稿。不会借用多卡示例配置；基础配置必须用户选择。高级 JSON 错误保留输入，服务执行权威字段/类型校验。
+6. `#/new?draftId=<id>&revision=<revision>&effectiveHash=<hash>` 只读展示完整 typed values，独立执行精确草稿 check。引用由 `{draftId,revision,effectiveHash}` 组成并与服务响应严格核对。这里**不启动训练、不入队、不写记事本**，绝不转为旧 200 字符 override。编辑通过创建新 ID，不修改旧草稿。
+
+Explicit registration precedes execution. Create a frozen task, check it, then explicitly start it using the returned revision/hash/validation ID. Import/export writes new directories and validates the native package. Select a registered dataset and shards, a trusted base configuration and caption settings to create an immutable draft. The dedicated New training query route preserves the exact typed reference and offers only a separate check, not training/queue/notebook actions. Every edit creates a new draft ID; full values never pass through legacy string overrides.
+
+### HTTP 协议 / HTTP protocol
+
+除读取基础配置选项的既有 `GET /api/configs` 外，工作区所有 GBC 请求均使用 `/api/gbc/v1/`。每个请求只发送一个 `X-UI-Token`，不使用 query token 或 cookie。所有写操作使用 JSON object，并由客户端加入 `apiVersion:"gbc-ui-v1"` 和新 `requestId`；不自动重试 POST。网络中断的写操作结果未知，必须刷新任务/资源并使用 requestId 对账，不能盲目重新提交。
+
+All GBC operations use `/api/gbc/v1/`, with exactly one `X-UI-Token` header and credentials omitted. The sole legacy metadata read is `GET /api/configs` for available base configs. POSTs carry `apiVersion` and a unique `requestId`, with no automatic retries. An interrupted mutation has an unknown outcome. JSON envelopes are version-checked: `{apiVersion,ok:true,data}` or `{apiVersion,ok:false,error:{code,message,details,retryable}}`. **HTTP 200 is not inner operation success**; draft checks inspect `check.ok`, `validation.status`, and matching hash/ref.
+
+| Method | Suffix | Request / response summary |
+| --- | --- | --- |
+| GET | `capabilities`, `settings` | `features/localProfiles/limits`; `{settings:{revision,roots,runtimes}}` |
+| POST | `settings` | `expectedRevision`, roots `{path,purpose,confirmTrust:true}` / runtimes `{python,role,confirmExecute:true}`; append trusted registrations |
+| POST | `runtimes/check` | `{runtimeId,checkMode:'version'|'doctor',confirmExecution:true}` → `{job}` |
+| POST | `tasks` | `{settingsRevision,inputRootId,relativePath,outputRootId,runtimeId,mode,timeoutSeconds?}`; local v1 adds `sourceKind` and `models:{vlm,detect,embed}:{rootId,relativePath}` → `{task}` |
+| POST | `tasks/check` | `{taskId,expectedRevision,confirmExecution:true}` → `{job}`; re-read task after completion |
+| POST | `jobs/start` | `{taskId,expectedRevision,manifestHash,validationId,confirmRun:true}` → `{job}` |
+| POST | `jobs/stop` | `{jobId,expectedRevision,force:boolean}` → `{job}`; stopping is not terminal |
+| GET | `tasks`, `jobs`, `datasets` | Optional respective resource ID; collections bounded to latest 100 |
+| GET | `jobs/logs` | `{jobId,cursor,maxBytes}` → `{text,nextCursor,dropped,terminal}`; byte cursor, UI reads 32 KiB and retains last 128 KiB display text |
+| GET | `requests` | `{requestId}` → receipt / reconciliation record |
+| POST | `imports` | `{sourceRootId,relativePath,outputRootId,dataRuntimeId,confirm:true}` → `{dataset}` |
+| POST | `exports` | `{artifactId,outputRootId,dataRuntimeId,confirm:true}` → `{dataset}` |
+| POST | `datasets/validate` | `{datasetId,expectedRevision,dataRuntimeId,confirm:true}` → updated `{dataset}` |
+| GET | `datasets/shards` | `{datasetId,offset,limit}` → `{shards,nextOffset}`; UI pages at most 100 shards |
+| GET | `datasets/page` | `{datasetId,dataRuntimeId,offset,limit}` → `{items,offset,nextOffset,total,shard}`; **row** offsets, UI pages at most 20 |
+| GET | `graphs` | `{artifactId,offset,limit}` → `{items,offset,nextOffset}`; **JSONL byte** offsets, UI passes server `nextOffset`, never increments by row count |
+| GET | `datasets/media` | `{datasetId,dataRuntimeId,shard,key,size?}` → `{media}`; size is `thumb` or `detail`; exact shard/key from dataset page |
+| GET | `graphs/media` | `{artifactId,sampleId,size?}` → `{media}`; size is `thumb` or `detail`; exact IDs from graph page, registered data runtime required |
+| POST | `training-drafts` | `{datasetId,datasetRevision,shards,baseConfigId,captionOptions,knobPatch?,confirmExecution:true}` → `{draft}` |
+| GET | `training-drafts` | `{draftId,revision}` → `{draft}`; no internal dataset path in wire values |
+| POST | `training-drafts/check` | `{draftRef,confirmExecution:true}` → `{check}`; real bounded trainer checker, missing weights can return HTTP 200 with `ok:false` |
+| POST | `captions/preview` | `{draftRef,sampleId,seed,variant,target?:{width,height}}` → `{preview}`; dataset sampleId is `shard/key` |
+
+`declaredSamples`, `manifestRows`, `validatedSamples`, `actualBytes` 分别展示；null 是未知横线，不是 0。图节点 ID 空字符串是有效根节点；显示叠层仅用 `displayBbox`，不改原始 bbox。节点、边和描述文本均转义，JSON 从不作为 HTML 执行。图像媒体须采用已实现的受鉴权端点，不从图中的任意路径或 URL 取图。
+
+Counts are distinct, and null is never rendered as validated zero. Graph root ID `""` is valid. Overlay geometry uses `displayBbox` without mutating original `bbox`. Graph labels/descriptions are escaped text. Graph inspection supports node/edge-linked selection, zoom and arrow/Home/End focus navigation.
+
+媒体端点已实现，`features.media=true` 只表示协议支持，仍需要可信数据运行环境与解码依赖。返回标准版本化 JSON envelope，`data.media={mimeType:'image/png',encoding:'base64',base64,width,height,sourceWidth,sourceHeight,size,orientation:'stored-image'}`。UI 选择样本后请求 `size=detail`，验证 PNG 类型/签名、像素尺寸与原图几何后转为 Blob URL；不把 token 写入图片 URL，不使用图中的 path/url，不回退传原图或外链。加载、错误和样本切换时不保留上一张图像；路由离开时 abort 并 revoke 对象 URL。
+
+The implemented media endpoints return a versioned JSON envelope containing the above media DTO. The UI explicitly requests `detail` for the selected sample, validates MIME/PNG signature/dimensions against the graph's stored image, then renders a Blob URL. Authentication remains one `X-UI-Token` header with credentials omitted. No file-path/URL fallback or token-bearing image URL exists. Loading/failure clears the previous image; switching samples or leaving the route aborts requests and revokes object URLs.
+
+限制：thumb 最长边 384、detail 最长边 1600，不放大、不裁剪、不进行 EXIF 转置，保持存储图像方向和宽高比。输出 PNG ≤4 MiB，base64 ≤5,592,408 字符；输入 ≤32 MiB、≤4,000 万像素。支持 worker 可解码的 JPEG/PNG/WebP/JPEGXL（后者依赖 codec），拒绝动画、非恒等 EXIF、SVG/HTML。worker 超时 30 秒。成功与错误均返回 no-store、nosniff 和 sandbox CSP；依赖缺失、源变化、超时与解码失败显式报错，媒体能力不意味着真实模型推理可用。
+
+Limits: thumbnail/detail longest edges are 384/1600 pixels, with no upscaling, cropping or EXIF transpose. The output is at most 4 MiB PNG (5,592,408 base64 characters); source input is at most 32 MiB and 40 million pixels. JPEG/PNG/WebP/JPEGXL depend on available worker codecs; animation, nonidentity EXIF, SVG and HTML are rejected. Worker deadline is 30 seconds. Success and error responses are no-store, nosniff and sandboxed. Missing dependencies, changed sources, timeout and decoding errors stay explicit. Full-image `displayBbox` overlays must not use caption-preview crop boxes.
+
+Caption controls expose weighted formats, tag source/weight/drop/shuffle, natural-language short probability, graph keep/drop and fit settings. Advanced full JSON remains available and validated. Preview shows seed/variant, optional expected target, actual planner geometry, character budget and provenance. `hardTokenLimit:false` is intentional: character fitting is not a strict token guarantee; preview RNG row=0 is not an unknown training catalog row. Preview errors retain edits. A changed draft requires a new ID.
+
+路由离开遵循 `__studioCleanup`：abort 请求、清 timer、移除监听并释放媒体 URL；晚响应不得覆盖新页面。后台标签页暂停任务轮询。所有动作防重复忙碌，错误展示稳定 code 与可定位的字段诊断。远程 API capability=false，不创建凭据字段，不外传数据，不在日志或 storage 保存模型凭据；未来支持仍需要单独外传确认。
+
+On route cleanup, requests are aborted, timers/listeners removed and object URLs released; late responses cannot replace another view. Polling pauses while the tab is hidden. Busy guards prevent duplicate actions. Remote API capability is false: no remote credentials UI, no model-credential storage and no image egress. Future remote support still needs explicit egress consent.
+
+### 验证范围 / Verification scope
+
+定向测试 `node tests/gbc_ui.mjs` 运行真实 ES modules 与现有轻量 DOM 测试工具，wire 为内存 fixture；另跑词典/主题门禁与修改 JS 语法检查。最终浏览器主题/窄屏/键盘/真实接口回放由主代理验收。没有声称真实模型生成或训练已验证；不安装依赖、不下载模型、不调用付费 API、不运行真实训练。
+
+The targeted Node tests execute real modules and the existing structural DOM harness with memory-only wire fixtures. They do not certify browser layout or real inference. Final browser verification is separate. Real model generation and training have **not** been verified by this frontend implementation.

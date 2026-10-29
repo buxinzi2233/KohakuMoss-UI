@@ -29,6 +29,56 @@ relevant log output.
 CLI options, trainer file/process contract, and local security limits. Historical
 plans under `docs/plans/` are not the current API specification.
 
+## GBC workspace / GBC 工作区
+
+Open **Datasets → GBC workspace** (`#/datasets/gbc`). Register trusted local
+input/output/model directories and generator/data runtimes explicitly. Choose
+recorded-trace replay or the finite `qwen35-local-v1` profile, create a frozen task,
+check it, then explicitly start/stop generation. Nothing executes or downloads on
+page entry. The official local profile is not an 8 GiB guarantee; installed
+capabilities and real model inference must be checked separately.
+
+Import native standard datasets or explicitly export task artifacts into new
+validated packages. Inspect bounded sample/shard pages, select graph nodes/edges,
+and configure weighted caption formats, tags, natural language, graph and fit.
+Advanced JSON retains invalid input for correction. Null counts mean unknown,
+not validated zero. Selecting a sample loads a real authenticated PNG preview
+through `datasets/media` or `graphs/media`: header-only token, JSON base64 → Blob,
+no arbitrary file/URL fallback. Detail images are bounded to a 1600-pixel longest
+edge and 4 MiB, preserve the stored-image orientation/aspect ratio, and do not
+upscale. Overlay boxes remain in the original graph's normalized coordinates.
+Media capability means protocol support, not installed data-runtime dependencies.
+
+选择样本会通过受鉴权 `datasets/media` 或 `graphs/media` 获取真实 PNG 预览，
+JSON base64 转 Blob，不将 token 写入图片 URL，也不回退读取任意文件或外链。
+详情预览最长边 1600 像素、输出不超过 4 MiB；不放大、不裁剪、不做 EXIF 转置。
+失败和切换样本会清除旧图，离开页面会取消请求并释放对象 URL。需要已登记可信数据环境；
+媒体 capability=true 不代表依赖已安装。
+
+Select a dataset, shards and a trusted base config to create an **immutable typed
+training draft**. Explicitly correct crop/flip conflicts; no example multi-GPU
+parameters are silently copied. The dedicated route
+`#/new?draftId=…&revision=…&effectiveHash=…` shows full read-only typed values and
+an independent exact-draft check. It does **not** start training, enqueue or add a
+notebook item, and never truncates DATASETS into legacy overrides. Edits create
+new IDs. Preview reports real planner geometry and a character estimate;
+`hardTokenLimit:false` is not a hard token guarantee.
+
+入口为 **数据集 → GBC 工作区**（`#/datasets/gbc`），沿用现有主题和布局。
+显式信任登记本地目录与运行环境后，可创建、检查并启停生成任务；导入标准数据包、
+导出产物、查看分片与图描述、编辑 Caption 并创建完整类型化草稿。草稿必须选择可信
+基础配置和分片；裁剪/翻转冲突由用户明确修正，修改生成新 ID。新建训练页面的专用
+草稿引用仅提供只读值与独立检查，不自动训练、排队或写入记事本。
+
+All GBC requests use versioned `/api/gbc/v1/` with header-only `X-UI-Token`;
+mutations are not automatically retried. Remote APIs are unsupported: no image
+egress or model-credential fields/storage. See the bilingual GBC section in
+[interfaces.md](docs/interfaces.md) for schemas, pagination units and limits.
+
+定向 UI 测试：`node tests/gbc_ui.mjs`（内存 wire fixture，不运行模型或训练）。
+真实生成与训练**尚未验证**；浏览器最终验收与后端执行验证分别进行，不以测试 fixture
+冒充真实生成结果。不自动安装依赖、下载模型或调用付费 API。
+
 ## Install
 
 Use the trainer's own virtualenv so the UI runs on the same Python and sees `kogine`:
