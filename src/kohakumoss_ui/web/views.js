@@ -4,6 +4,7 @@ import {
   bar, bars, bytes, clock, duration, esc, logLine, metric, num, rate, spark, when,
 } from "./format.js";
 import { collectOverrides, initialValues, mountKnobForm } from "./knobform.js";
+import { gbcDraftView } from "./gbc-draft.js";
 
 function loading(label) {
   return `<div class="loading surface">${esc(label)}…</div>`;
@@ -279,6 +280,7 @@ export async function runsView(main, ctx) {
 export async function newView(main, ctx, slug = "") {
   const state = ctx.state;
   const query = ctx.query();
+  if (query.has("draftId")) return gbcDraftView(main, ctx);
   main.innerHTML = loading(ctx.t("new.loading"));
   try {
     const [knobs, configs] = await Promise.all([
@@ -495,8 +497,8 @@ export async function datasetsView(main, ctx) {
       return `<tr>
         <td>${esc(item.source)}${item.template ? ` <span class="dim">${esc(ctx.t("datasets.template"))}</span>` : ""}</td>
         <td class="wrap">${esc(item.path)}${item.exists ? "" : ` <span class="red">${esc(ctx.t("datasets.notFound"))}</span>`}</td>
-        <td>${item.images}${item.truncated ? "+" : ""}</td>
-        <td>${item.captions}${item.truncated ? "+" : ""}</td>
+        <td>${esc(item.images ?? "—")}${item.truncated ? "+" : ""}</td>
+        <td>${esc(item.captions ?? "—")}${item.truncated ? "+" : ""}</td>
         <td>${cache}</td>
         <td class="wrap">${configLinks || `<span class="dim">—</span>`}</td>
         <td>${use}</td>
@@ -507,7 +509,7 @@ export async function datasetsView(main, ctx) {
       <div class="vhead surface">
         <h2>${esc(ctx.t("datasets.title"))}</h2>
         <div class="meta">${esc(ctx.t("datasets.meta", { sources: data.datasets.length, configs: data.scanned_configs.length }))}</div>
-        <div class="acts"><button class="btn" id="rescan">${esc(ctx.t("datasets.rescan"))}</button><a class="btn pri" href="#/new">${esc(ctx.t("datasets.new"))}</a></div>
+        <div class="acts"><a class="btn" href="#/datasets/gbc">${esc(ctx.t("gbc.title"))}</a><button class="btn" id="rescan">${esc(ctx.t("datasets.rescan"))}</button><a class="btn pri" href="#/new">${esc(ctx.t("datasets.new"))}</a></div>
       </div>
       ${data.datasets.length ? `<div class="table-frame surface"><div class="table-scroll" tabindex="0"><table class="led"><thead><tr><th>${esc(ctx.t("datasets.col.source"))}</th><th>${esc(ctx.t("datasets.col.path"))}</th><th>${esc(ctx.t("datasets.col.images"))}</th><th>${esc(ctx.t("datasets.col.captions"))}</th><th>${esc(ctx.t("datasets.col.cache"))}</th><th>${esc(ctx.t("datasets.col.declared"))}</th><th>${esc(ctx.t("datasets.col.use"))}</th></tr></thead><tbody>${rows}</tbody></table></div></div><div class="scroll-hint surface">${esc(ctx.t("datasets.scroll"))}</div>` : emptyState(ctx.t("datasets.empty.title"), [ctx.t("datasets.empty.line")])}
       <div class="okline surface">${esc(ctx.t("datasets.note"))}</div>

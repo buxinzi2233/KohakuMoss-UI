@@ -229,6 +229,10 @@ async function renderRoute() {
       await views.newView(main, ctx, decodeURIComponent(parts[1]));
     } else if (parts[0] === "new") {
       await views.newView(main, ctx, "");
+    } else if (parts[0] === "datasets" && parts[1] === "gbc") {
+      crumb.textContent = `${t("nav.group.data")} / ${t("gbc.title")}`;
+      if (studio?.gbcView) await studio.gbcView(main, ctx);
+      else unavailableView(t("gbc.title"));
     } else if (parts[0] === "grabber") {
       if (studio?.grabberView) await studio.grabberView(main, ctx);
       else unavailableView(t("nav.grabber"));

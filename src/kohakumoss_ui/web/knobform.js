@@ -932,6 +932,11 @@ function pyLiteral(value, kind) {
   }
 }
 
+/** Complete typed draft values; never feed these into legacy text overrides. */
+export function renderTypedDraft(values) {
+  return `<div class="gbc-typed">${Object.entries(values || {}).map(([name, value]) => `<details class="box"><summary><code>${esc(name)}</code> · ${esc(value === null ? "null" : Array.isArray(value) ? "array" : typeof value)}</summary><pre class="code gbc-json">${esc(JSON.stringify(value, null, 2))}</pre></details>`).join("")}</div>`;
+}
+
 export function collectOverrides(root, initial) {
   const overrides = {};
   root.querySelectorAll("[data-knob]").forEach((input) => {

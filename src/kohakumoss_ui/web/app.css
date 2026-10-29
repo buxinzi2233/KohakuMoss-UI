@@ -764,6 +764,44 @@ html[data-lang="zh"][data-theme] .app :is(
   .studio-aside,.studio-stack{gap:10px}
 }
 
+/* GBC reuses the shell surfaces; no new palette, glass layer or animation. */
+.gbc-workspace{min-width:0;max-width:100%}
+.gbc-workspace h1{font-size:var(--fs-h1);margin:0;line-height:var(--lh-body)}
+.gbc-workspace h2{font-size:var(--fs-14);margin:0 0 12px}
+.gbc-workspace h3,.gbc-workspace h4{font-size:var(--fs-12);margin:12px 0}
+.gbc-workspace .box{margin-block:12px;padding:var(--surface-pad-x)}
+.gbc-controls{border:0;padding:0;margin:0;min-width:0}
+.gbc-workspace [hidden]{display:none!important}
+.gbc-toolbar,.gbc-cap-list{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-block:12px}
+.gbc-toolbar [aria-selected="true"]{border-bottom:2px solid var(--accent)}
+.gbc-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px;align-items:end;margin-block:16px}
+.gbc-wide{grid-column:1/-1}
+.gbc-field{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:var(--fs-12)}
+.gbc-field .field,.gbc-workspace textarea.field{width:100%;max-width:100%;min-width:0}
+.gbc-check{display:flex;align-items:center;gap:8px;font-size:var(--fs-12);min-height:34px}
+.gbc-workspace .btn{white-space:normal;letter-spacing:0;text-transform:none;min-height:32px;font-size:var(--fs-12)}
+.gbc-workspace .btn:disabled{opacity:.7}
+.gbc-workspace .hint{font-size:var(--fs-12);line-height:var(--lh-body);white-space:normal;overflow-wrap:anywhere}
+.gbc-workspace code,.gbc-workspace li{overflow-wrap:anywhere}
+.gbc-json{white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;font-size:var(--fs-12)}
+.gbc-log{white-space:pre-wrap;overflow-wrap:anywhere;max-height:300px;overflow:auto}
+.gbc-error{color:var(--warn);border-color:var(--warn)}
+.gbc-graph-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px}
+.gbc-image-scroll{min-width:0;max-height:650px;overflow:auto;overscroll-behavior:contain}
+.gbc-image{position:relative;width:100%;background:var(--canvas);border:1px solid var(--border-default);overflow:hidden}
+.gbc-image img{display:block;width:100%;height:100%;object-fit:fill}
+.gbc-bbox{position:absolute;border:1px solid var(--accent);background:transparent;cursor:pointer;padding:0;color:var(--text-primary);min-width:0;min-height:0}
+.gbc-bbox span{position:absolute;left:0;top:0;background:var(--panel);font-size:var(--fs-10);max-width:100%;overflow:hidden}
+.gbc-bbox[aria-pressed="true"]{border-width:3px;background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.gbc-bbox:focus-visible{outline:2px solid var(--text-primary);outline-offset:-5px}
+.gbc-node-pane{min-width:0}
+.gbc-node-list{display:flex;flex-wrap:wrap;gap:6px;max-height:180px;overflow:auto}
+.gbc-node-list [aria-pressed="true"],.gbc-linked{border-color:var(--accent);background:var(--accent-soft)}
+.gbc-edges{padding-inline-start:20px;max-height:240px;overflow:auto}
+.gbc-edges li{margin-block:8px}
+.gbc-workspace [aria-invalid="true"]{border-color:var(--warn)}
+@media(max-width:900px){.gbc-graph-grid{grid-template-columns:minmax(0,1fr)}.gbc-workspace .vhead{flex-wrap:wrap}.gbc-toolbar{gap:8px}.gbc-workspace .btn{min-height:40px}}
+@media(pointer:coarse){.gbc-workspace input,.gbc-workspace select,.gbc-workspace textarea{font-size:max(16px,1rem)}}
 /* Image collection: reuse the full-width form, tabs and gallery geometry. */
 .grabber .tabs{flex-wrap:wrap}
 .grabber .grabber-candidates{display:flex;flex-wrap:wrap;gap:8px}
