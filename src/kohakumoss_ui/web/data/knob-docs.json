@@ -101,6 +101,21 @@
       "zh": "VAE 文件或目录；留空时用 WEIGHTS 里的 vae。换 VAE 或它不在默认位置时改。",
       "doc": "docs/zh-CN/guides/weights.md#comfyui-布局"
     },
+    "ENCODE_DEVICES": {
+      "en": "Encoder GPUs such as (4, 5): the text encoder and VAE run there while DEVICES only trains. Set it to take encoder VRAM off the training cards.",
+      "zh": "编码卡（如 (4, 5)）：文本编码器与 VAE 跑在这些卡上，DEVICES 只负责训练。想把编码显存从训练卡分出去时设。",
+      "doc": "docs/internals/encode-feed.md#encode-feed"
+    },
+    "ENCODE_DEPTH": {
+      "en": "Encode feed: micro-batches each data stream keeps encoded ahead of its training ranks. Raise it to smooth encoder stalls, at the cost of host RAM.",
+      "zh": "编码馈送：每条数据流提前编码好的微批数。调大可抹平编码停顿，代价是主机内存。",
+      "doc": "docs/internals/encode-feed.md#data-flow"
+    },
+    "ENCODE_CHUNK": {
+      "en": "Encode feed: micro-batches per encoder request, one text-encoder call and one VAE call. Raise it to batch the encoder work harder.",
+      "zh": "编码馈送：每次编码器请求的微批数，对应一次文本编码与一次 VAE 调用。调大可让编码更批量化。",
+      "doc": "docs/internals/encode-feed.md#data-flow"
+    },
     "VAE_ENCODE": {
       "en": "VAE placement plan: memory mode and chunking. Tune it to save VRAM or to speed up latent encoding.",
       "zh": "VAE 的放置方案：显存模式与分块粒。想省显存或加快潜变量编码时调它。",
@@ -520,6 +535,16 @@
       "en": "Input-gradient GEMM in fp8 (keeps an fp8 W^T copy, 2 B per weight) or 16-bit (1 B per weight).",
       "zh": "输入梯度 GEMM 用 fp8（保留 fp8 的 W^T 副本，每权重 2 字节）或 16 位（1 字节）。",
       "doc": "docs/zh-CN/concepts/profiles.md#精度配置项"
+    },
+    "INT8_COMPUTE": {
+      "en": "int8 bases run real int8 GEMMs (activations quantized per row) instead of weight-only. CUDA only, and it needs an int8 base.",
+      "zh": "int8 基座改跑真正的 int8 GEMM（激活按行量化），而非仅权重量化。仅 CUDA，且需 int8 基座。",
+      "doc": "docs/internals/quant-kernels.md#int8-compute"
+    },
+    "INT8_DGRAD": {
+      "en": "Input-gradient GEMM of int8 compute: int8 (default) or 16bit. Switch to 16bit when int8 input gradients hurt accuracy.",
+      "zh": "int8 计算的输入梯度 GEMM：int8（默认）或 16bit。int8 输入梯度影响精度时换 16bit。",
+      "doc": "docs/internals/quant-kernels.md#int8-compute"
     },
     "MEMORY_OVERRIDES": {
       "en": "Raw MemoryPlan field overrides layered onto whichever profile mode is active. The escape hatch past the catalog.",
