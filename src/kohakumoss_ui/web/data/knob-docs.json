@@ -396,6 +396,16 @@
       "zh": "把依赖 sigma 的权重乘到损失上：none 是 MOSS 方案，x0/eps 对应其他目标空间。",
       "doc": "docs/zh-CN/concepts/training.md#目标函数"
     },
+    "STREAM_LOSS": {
+      "en": "Residual-stream penalties on every joint block output: the concentration and peak terms. Turn it on to tame massive channels.",
+      "zh": "对每个联合块输出加残差流惩罚（concentration 与 peak 两项）。要压巨量通道时开。",
+      "doc": "docs/concepts/training.md#stream-penalties"
+    },
+    "CONCENTRATION_LOSS": {
+      "en": "The concentration term alone (weight, k): penalises the share of a block's energy held by its k largest channels.",
+      "zh": "只加 concentration 项（weight、k）：惩罚块输出能量集中在 k 个最大通道上。",
+      "doc": "docs/concepts/training.md#stream-penalties"
+    },
     "OPTIMIZER": {
       "en": "Optimizer: adamw, adamw16, 8-bit variants, muon, prodigy and friends. Change it for memory or convergence behaviour.",
       "zh": "优化器算法与实现：adamw、adamw16、8bit 变体、muon、prodigy 等。换显存策略或收敛方式时改。",
