@@ -102,6 +102,18 @@ def integer(value, label, low=0, high=2**53 - 1):
     return number(value, label, low, high)
 
 
+def rate(value, label):
+    """A drop or keep rate: a number, or [lo, hi] drawn per caption by the trainer."""
+    if type(value) is list:
+        if len(value) != 2:
+            fail(label + " must be a number or a [lo, hi] pair")
+        low, high = (number(bound, label, 0, 1) for bound in value)
+        if low > high:
+            fail(label + " range is reversed")
+        return value
+    return number(value, label, 0, 1)
+
+
 def strings(value, label, nonempty=False):
     if type(value) is not list or (nonempty and not value):
         fail(label + " must be a list")
@@ -144,7 +156,7 @@ def caption(value):
             r"[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*", text(rule["field"], "field")
         ):
             fail("Invalid metadata field")
-        number(rule.get("drop", 0), "drop", 0, 1)
+        rate(rule.get("drop", 0), "drop")
         for key, n in (("bins", 2), ("ranges", 3)):
             rows = rule.get(key, [])
             if type(rows) is not list:
@@ -173,10 +185,23 @@ def caption(value):
         fail("formats must be nonempty")
     sections = {"graph", "nl", "tags"} | set(meta)
     for fmt in formats:
-        obj(fmt, {"weight", "sections"}, {"weight", "sections"})
+        obj(
+            fmt,
+            {"weight", "sections", "requires", "drop"},
+            {"weight", "sections"},
+        )
         number(fmt["weight"], "format weight", 1e-12, 1e12)
         if set(strings(fmt["sections"], "sections", True)) - sections:
             fail("Unknown format section")
+        if set(strings(fmt.get("requires", []), "requires")) - set(meta):
+            fail("Unknown required section")
+        overrides = fmt.get("drop", {})
+        if type(overrides) is not dict:
+            fail("format drop must be an object")
+        for name, drop in overrides.items():
+            if name != "tags" and name not in meta:
+                fail("Unknown format drop section")
+            rate(drop, "format drop")
     tags = obj(
         value.get("tags", {}), {"sources", "drop", "shuffle", "exclude", "dedupe"}
     )
@@ -191,7 +216,7 @@ def caption(value):
             ):
                 fail("Unknown tag source")
             number(source.get("weight", 1), "tag source weight", 1e-12, 1e12)
-    number(tags.get("drop", 0), "tag drop", 0, 1)
+    rate(tags.get("drop", 0), "tag drop")
     if "shuffle" in tags and type(tags["shuffle"]) is not bool:
         fail("shuffle must be boolean")
     for pattern in strings(tags.get("exclude", []), "exclude"):
@@ -202,9 +227,10 @@ def caption(value):
         except re.error:
             fail("Invalid exclude regex")
     strings(tags.get("dedupe", []), "dedupe")
-    for key, fields in (("nl", {"short"}), ("graph", {"keep", "tag_drop"})):
-        for field, v in obj(value.get(key, {}), fields).items():
-            number(v, key + "." + field, 0, 1)
+    for field, v in obj(value.get("nl", {}), {"short"}).items():
+        number(v, "nl." + field, 0, 1)
+    for field, v in obj(value.get("graph", {}), {"keep", "tag_drop"}).items():
+        rate(v, "graph." + field)
     fit = obj(
         value.get("fit", {}),
         {

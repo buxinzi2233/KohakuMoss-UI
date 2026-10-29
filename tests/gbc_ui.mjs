@@ -55,6 +55,9 @@ try {
     const cap = { template: "gbc", formats: [{ weight: 1, sections: ["graph", "tags", "nl"] }], tags: { sources: [{ from: "meta:tags.general", weight: 1 }], shuffle: false }, fit: { margin: 0.9, fallback: ["nl"] } };
     assert.equal(validateCaption(cap), cap);
     for (const invalid of [{ ...cap, formats: [] }, { ...cap, formats: [{ weight: 0, sections: ["graph"] }] }, { ...cap, tags: { shuffle: "false" } }, { ...cap, nl: { short: 2 } }, { ...cap, graph: { keep: NaN } }, { ...cap, fit: { margin: 0 } }, { ...cap, template: "a.b" }]) assert.throws(() => validateCaption(invalid));
+    const advanced = { ...cap, meta: { artist: { field: "artist", drop: [0.1, 0.3] } }, formats: [{ weight: 4, sections: ["tags", "artist"], requires: ["artist"], drop: { artist: 0, tags: [0.2, 0.6] } }, { weight: 1, sections: ["graph"] }], tags: { ...cap.tags, drop: [0, 0.5] }, graph: { keep: [0.4, 0.9], tag_drop: 0.5 } };
+    assert.equal(validateCaption(advanced), advanced);
+    for (const invalid of [{ ...cap, tags: { ...cap.tags, drop: [0.6, 0.2] } }, { ...cap, graph: { keep: [-0.1, 0.5] } }, { ...cap, graph: { tag_drop: [0.2, 0.4, 0.6] } }, { ...cap, formats: [{ weight: 1, sections: ["graph"], requires: "graph" }] }, { ...cap, formats: [{ weight: 1, sections: ["graph"], requires: ["artist"] }] }, { ...cap, formats: [{ weight: 1, sections: ["graph"], drop: { nl: 0.2 } }] }, { ...cap, formats: [{ weight: 1, sections: ["graph"], drop: { tags: [1.5, 0.2] } }] }, { ...cap, formats: [{ weight: 1, sections: ["graph"], drop: { tags: 2 } }] }]) assert.throws(() => validateCaption(invalid));
     const patch = { CROP: "random", FLIP: true, PARALLEL: "none", DEVICES: [0] }, fixed = geometryPatch(patch, "square_crop");
     assert.equal(patch.FLIP, true); assert.equal(fixed.FLIP, false); assert.equal(fixed.CROP, "center"); assert.deepEqual(fixed.DEVICES, [0]);
   });

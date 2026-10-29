@@ -9,26 +9,31 @@ function checkObject(value, allowed, path, required = []) {
   if (!object(value) || Object.keys(value).some((key) => !allowed.includes(key)) || required.some((key) => !(key in value))) throw new GbcError("INVALID_REQUEST", path);
 }
 function range(value, path, min = 0, max = 1) { if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) throw new GbcError("INVALID_REQUEST", path); }
+function rate(value, path) { if (Array.isArray(value)) { if (value.length !== 2) throw new GbcError("INVALID_REQUEST", path); range(value[0], path); range(value[1], path); if (value[0] > value[1]) throw new GbcError("INVALID_REQUEST", path); return; } range(value, path); }
 export function validateCaption(value) {
   checkObject(value, ["template", "formats", "meta", "tags", "nl", "graph", "fit", "prefix", "suffix", "list_sep", "section_sep", "text_sep", "underscores"], "captionOptions", ["template", "formats"]);
   if (value.template !== "gbc") throw new GbcError("INVALID_REQUEST", "captionOptions.template");
   if (!Array.isArray(value.formats) || !value.formats.length || value.formats.length > 128) throw new GbcError("INVALID_REQUEST", "captionOptions.formats");
   if (value.meta !== undefined && !object(value.meta)) throw new GbcError("INVALID_REQUEST", "captionOptions.meta");
-  const sections = new Set(["tags", "nl", "graph", ...Object.keys(value.meta || {})]);
+  const metaSections = new Set(Object.keys(value.meta || {}));
+  const sections = new Set(["tags", "nl", "graph", ...metaSections]);
   value.formats.forEach((fmt, i) => {
-    checkObject(fmt, ["weight", "sections"], `formats[${i}]`, ["weight", "sections"]); range(fmt.weight, `formats[${i}].weight`, 1e-12, 1e12);
+    checkObject(fmt, ["weight", "sections", "requires", "drop"], `formats[${i}]`, ["weight", "sections"]); range(fmt.weight, `formats[${i}].weight`, 1e-12, 1e12);
     if (!Array.isArray(fmt.sections) || !fmt.sections.length || fmt.sections.some((key) => !sections.has(key))) throw new GbcError("INVALID_REQUEST", `formats[${i}].sections`);
+    if (fmt.requires !== undefined && (!Array.isArray(fmt.requires) || fmt.requires.some((key) => typeof key !== "string" || !metaSections.has(key)))) throw new GbcError("INVALID_REQUEST", `formats[${i}].requires`);
+    if (fmt.drop !== undefined) { if (!object(fmt.drop)) throw new GbcError("INVALID_REQUEST", `formats[${i}].drop`); Object.entries(fmt.drop).forEach(([key, dropRate]) => { if (key !== "tags" && !metaSections.has(key)) throw new GbcError("INVALID_REQUEST", `formats[${i}].drop`); rate(dropRate, `formats[${i}].drop.${key}`); }); }
   });
   checkObject(value.tags || {}, ["sources", "drop", "shuffle", "exclude", "dedupe"], "tags");
   const tags = value.tags || {};
-  if (tags.drop !== undefined) range(tags.drop, "tags.drop");
+  if (tags.drop !== undefined) rate(tags.drop, "tags.drop");
   if (tags.shuffle !== undefined && typeof tags.shuffle !== "boolean") throw new GbcError("INVALID_REQUEST", "tags.shuffle");
   if (tags.sources !== undefined) {
     if (!Array.isArray(tags.sources) || !tags.sources.length) throw new GbcError("INVALID_REQUEST", "tags.sources");
     tags.sources.forEach((source) => { checkObject(source, ["from", "weight"], "tags.sources", ["from"]); if (typeof source.from !== "string" || !/^(graph:root|meta:[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)$/.test(source.from)) throw new GbcError("INVALID_REQUEST", "tags.sources.from"); if (source.weight !== undefined) range(source.weight, "tags.sources.weight", 1e-12, 1e12); });
   }
   for (const key of ["exclude", "dedupe"]) if (tags[key] !== undefined && (!Array.isArray(tags[key]) || tags[key].some((s) => typeof s !== "string" || !s))) throw new GbcError("INVALID_REQUEST", `tags.${key}`);
-  for (const [key, fields] of [["nl", ["short"]], ["graph", ["keep", "tag_drop"]]]) { checkObject(value[key] || {}, fields, key); Object.entries(value[key] || {}).forEach(([field, number]) => range(number, `${key}.${field}`)); }
+  checkObject(value.nl || {}, ["short"], "nl"); Object.entries(value.nl || {}).forEach(([field, short]) => range(short, `nl.${field}`));
+  checkObject(value.graph || {}, ["keep", "tag_drop"], "graph"); Object.entries(value.graph || {}).forEach(([field, graphRate]) => rate(graphRate, `graph.${field}`));
   checkObject(value.fit || {}, ["tag_drop_step", "tag_drop_max", "keep_step", "keep_min", "margin", "fallback"], "fit");
   Object.entries(value.fit || {}).forEach(([key, number]) => { if (key === "fallback") { if (!Array.isArray(number) || number.some((s) => !sections.has(s))) throw new GbcError("INVALID_REQUEST", "fit.fallback"); } else range(number, `fit.${key}`, key.endsWith("step") || key === "margin" ? 0.001 : 0); });
   for (const key of ["prefix", "suffix", "list_sep", "section_sep", "text_sep"]) if (value[key] !== undefined && typeof value[key] !== "string") throw new GbcError("INVALID_REQUEST", key);

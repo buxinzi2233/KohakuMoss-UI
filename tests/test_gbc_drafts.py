@@ -230,6 +230,48 @@ class DraftTests(unittest.TestCase):
             with self.subTest(cap=cap), self.assertRaises(DraftError):
                 caption(cap)
 
+    def test_caption_rates_and_format_overrides(self):
+        """The trainer's `Rate` and per-format `requires` / `drop` are draft-legal."""
+        meta = {"quality": {"field": "quality"}}
+        caption(
+            {
+                **CAPTION,
+                "tags": {"drop": [0.0, 0.5]},
+                "graph": {"keep": [0.4, 0.9], "tag_drop": 0.5},
+                "formats": [
+                    {
+                        "weight": 4,
+                        "sections": ["quality", "tags"],
+                        "requires": ["quality"],
+                        "drop": {"quality": 0.0, "tags": [0.2, 0.6]},
+                    },
+                    {"weight": 1, "sections": ["graph"]},
+                ],
+            }
+        )
+        caption({**CAPTION, "meta": {**meta, "artist": {"field": "artist", "drop": [0, 1]}}})
+        for bad in (
+            {**CAPTION, "tags": {"drop": [0.6, 0.2]}},
+            {**CAPTION, "tags": {"drop": [0.2]}},
+            {**CAPTION, "tags": {"drop": [-0.1, 0.5]}},
+            {**CAPTION, "tags": {"drop": [0.2, 1.5]}},
+            {**CAPTION, "tags": {"drop": ["a", "b"]}},
+            {**CAPTION, "tags": {"drop": [0.2, 0.4, 0.6]}},
+            {**CAPTION, "graph": {"keep": [3, 1]}},
+            {**CAPTION, "meta": {"quality": {"field": "quality", "drop": [1.5, 2]}}},
+            {**CAPTION, "formats": [{"weight": 1, "sections": ["graph"], "requires": "graph"}]},
+            {**CAPTION, "formats": [{"weight": 1, "sections": ["graph"], "requires": [1]}]},
+            {**CAPTION, "formats": [{"weight": 1, "sections": ["graph"], "requires": ["graph"]}]},
+            {**CAPTION, "formats": [{"weight": 1, "sections": ["graph"], "requires": ["nope"]}]},
+            {**CAPTION, "formats": [{"weight": 1, "sections": ["graph"], "drop": {"tags": 2}}]},
+            {**CAPTION, "formats": [{"weight": 1, "sections": ["graph"], "drop": {"nl": 0.2}}]},
+            {**CAPTION, "formats": [{"weight": 1, "sections": ["graph"], "drop": {"graph": [0.1, 0.2]}}]},
+            {**CAPTION, "formats": [{"weight": 1, "sections": ["graph"], "drop": []}]},
+            {**CAPTION, "formats": [{"weight": 1, "sections": ["graph"], "unknown": 1}]},
+        ):
+            with self.subTest(bad=bad), self.assertRaises(DraftError):
+                caption(bad)
+
     def test_changed_effective_file_rejected(self):
         ref = self.service.create(self.payload)["draftRef"]
         self.service.check(ref)
